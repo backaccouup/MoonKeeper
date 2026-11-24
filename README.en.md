@@ -18,9 +18,9 @@ Implemented so far:
 - Checking for truncation, negative lengths, oversized frames, invalid field lengths, and trailing bytes.
 - Incremental framing for fragmented and concatenated input, validating lengths before buffering payloads and detecting incomplete frames at EOF.
 - Single-address native TCP, a combined connection/handshake deadline, negotiation validation, and connection cleanup on normal exit, errors, or cancellation.
-- 25 portable protocol tests, 12 local TCP/client tests, and explicitly enabled real ZooKeeper integration tests.
+- Portable protocol tests, local TCP/client tests, and explicitly enabled real ZooKeeper integration tests.
 
-**Connection establishment, the handshake, and serial `exists` queries are implemented.** Concurrent dispatch, heartbeats, node writes, watches, authentication, transactions, and session recovery remain planned. Leaving the scope closes TCP but does not yet send `closeSession`; the server expires the session after its negotiated timeout. Keeping the callback alive does not maintain the session automatically. The project has not been published to Mooncakes.
+**Connection establishment, the handshake, and serial persistent znode CRUD are implemented.** Concurrent dispatch, heartbeats, watches, authentication, transactions, and session recovery remain planned. Leaving the scope closes TCP but does not yet send `closeSession`; the server expires the session after its negotiated timeout. Keeping the callback alive does not maintain the session automatically. The project has not been published to Mooncakes.
 
 ## Running locally
 
@@ -95,8 +95,15 @@ let options = @client.ClientOptions::new(
 @client.with_client(options, client => {
   let info = client.session_info()
   println(info.session_id)
-  let root = client.exists("/")
-  println(root)
+  let path = "/moonkeeper-demo"
+  let create_options = @moonkeeper.CreateOptions::new(
+    @moonkeeper.CreateMode::Persistent,
+    @moonkeeper.open_acl_unsafe(),
+  )
+  ignore(client.create(path, Some(b"hello"), create_options))
+  let current = client.get_data(path)
+  let updated = client.set_data(path, Some(b"world"), current.stat.version)
+  client.delete(path, updated.version)
 })
 ```
 
@@ -105,13 +112,15 @@ let options = @client.ClientOptions::new(
 | Option | Default | Current purpose |
 | --- | --- | --- |
 | `session_timeout_ms` | 30000 | Requested session timeout; the server negotiates the actual value |
-| `request_timeout_ms` | 10000 | Combined connection/handshake deadline; does not limit the callback |
-| `max_frame_size` | 1048576 | Payload byte limit; the client accepts 45–1048576 |
+| `request_timeout_ms` | 10000 | Deadline for connection, handshake, and each serial request; does not limit the whole callback |
+| `max_frame_size` | 1048576 | Request and response payload limit; the client accepts 45–1048576 |
 | `read_only` | false | Allow a read-only server |
 | `max_pending_requests` | 256 | Reserved for request dispatch; no application request queue exists yet |
 | `event_buffer_capacity` | 256 | Reserved for notifications; no event queue exists yet |
 
-`Client::exists(path)` returns `Stat?`. Only the server's `NoNode` becomes `None`; other server errors are raised. `Client::state()` exposes the state; `Client::close()` is idempotent and closes TCP. Requests are currently serialized by a mutex and use increasing positive xids. A read timeout closes this connection and marks it `Disconnected`, which does not prove that the ZooKeeper session expired. See [failure and lifecycle semantics](docs/semantics.md).
+`Client::exists(path)` returns `Stat?`; only server `NoNode` becomes `None`. `create` returns the created path, `get_data` returns `Bytes?` and the full `Stat`, `set_data` returns the updated `Stat`, and `delete` returns unit. Null data and empty bytes remain distinct. `CreateOptions` requires an explicit ACL; `open_acl_unsafe()` grants all permissions to `world:anyone` and is only suitable for unrestricted nodes. Only `Persistent` is supported. Version `-1` bypasses the version condition; nonnegative versions must match; values below `-1` are rejected locally. Other server errors retain their codes. Import `"Mr-Shi123/moonkeeper"` alongside the client package for these types.
+
+`Client::state()` exposes the state; `Client::close()` is idempotent and closes TCP. Requests are serialized by a mutex and use increasing positive xids. A read timeout closes this connection and marks it `Disconnected`. If a write may have been sent before failure, `OutcomeUnknown` tells callers to inspect server state before retrying. See [failure and lifecycle semantics](docs/semantics.md).
 
 `ClientError` distinguishes invalid options, transport failures, handshake or request timeouts, protocol and server errors, session rejection, and closed state. The client validates the protocol version, negotiated timeout, nonzero session ID, 16-byte password, and read-only permission. Errors contain neither raw responses nor passwords. The module namespace remains `Mr-Shi123/moonkeeper` and is managed separately from the GitHub commit identity.
 
@@ -155,7 +164,7 @@ Ten feature increments extend the original protocol prototype. Documentation mai
 | 1 | Project setup, handshake codec, tests, and offline example | Implemented |
 | 2 | Native TCP, incremental framing, and handshake with a real server | Implemented |
 | 3 | Request IDs, response dispatch, heartbeats, and timeouts | In progress: serial exists and request timeout |
-| 4 | Create, read, update, and delete znodes | Planned |
+| 4 | Create, read, update, and delete persistent znodes | Implemented |
 | 5 | Children, stat metadata, version checks, and ephemeral/sequential nodes | Planned |
 | 6 | Watch registration, notification dispatch, and cancellation semantics | Planned |
 | 7 | ACLs and Digest authentication | Planned |

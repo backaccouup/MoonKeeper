@@ -35,7 +35,7 @@ try {
     }
     if (-not $ready) { throw "ZooKeeper handshake readiness failed at ${HostName}:$Port." }
     moon test integration --target native --include-skipped --deny-warn
-    if ($LASTEXITCODE -ne 0) { throw 'Real ZooKeeper handshake tests failed.' }
+    if ($LASTEXITCODE -ne 0) { throw 'Real ZooKeeper integration tests failed.' }
 } finally {
     if ($started) {
         docker compose -p $projectName -f $composePath down --volumes --remove-orphans

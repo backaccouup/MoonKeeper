@@ -1,5 +1,6 @@
 import {
   "Mr-Shi123/moonkeeper/client",
+  "Mr-Shi123/moonkeeper",
   "moonbitlang/async",
   "moonbitlang/core/env",
   "moonbitlang/core/string",
