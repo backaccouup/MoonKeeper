@@ -40,6 +40,8 @@ pub fn Client::close(Self) -> Unit
 pub async fn Client::create(Self, String, Bytes?, @moonkeeper.CreateOptions) -> String
 pub async fn Client::delete(Self, String, Int32) -> Unit
 pub async fn Client::exists(Self, String) -> @moonkeeper.Stat?
+pub async fn Client::get_children(Self, String) -> Array[String]
+pub async fn Client::get_children_with_stat(Self, String) -> @moonkeeper.ChildrenResult
 pub async fn Client::get_data(Self, String) -> @moonkeeper.DataResult
 pub fn Client::session_info(Self) -> SessionInfo
 pub async fn Client::set_data(Self, String, Bytes?, Int32) -> @moonkeeper.Stat

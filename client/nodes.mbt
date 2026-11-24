@@ -146,3 +146,29 @@ pub async fn Client::delete(
     true,
   )
 }
+
+///|
+/// Returns child names in server order; callers should sort if needed.
+pub async fn Client::get_children(
+  self : Client,
+  path : String,
+) -> Array[String] {
+  self.request(
+    xid => @moonkeeper.encode_get_children_request(xid, path),
+    payload => @moonkeeper.decode_get_children_response(payload),
+    false,
+  )
+}
+
+///|
+/// Returns the same child names together with the parent node's full Stat.
+pub async fn Client::get_children_with_stat(
+  self : Client,
+  path : String,
+) -> @moonkeeper.ChildrenResult {
+  self.request(
+    xid => @moonkeeper.encode_get_children_with_stat_request(xid, path),
+    payload => @moonkeeper.decode_get_children_with_stat_response(payload),
+    false,
+  )
+}
