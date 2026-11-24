@@ -1,0 +1,9 @@
+import {
+  "Mr-Shi123/moonkeeper",
+  "moonbitlang/async",
+  "moonbitlang/async/socket",
+  "moonbitlang/async/io",
+  "moonbitlang/core/debug",
+}
+
+supported_targets = "native"

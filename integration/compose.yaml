@@ -1,0 +1,17 @@
+services:
+  zookeeper:
+    image: zookeeper:3.9.3
+    environment:
+      ZOO_4LW_COMMANDS_WHITELIST: ruok,srvr
+      ZOO_ADMINSERVER_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${MOONKEEPER_ZK_PORT:-21819}:2181"
+    tmpfs:
+      - /data
+      - /datalog
+    healthcheck:
+      test: ["CMD", "zkServer.sh", "status"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+      start_period: 5s

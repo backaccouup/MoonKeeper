@@ -14,6 +14,8 @@ pub suberror ProtocolError {
   TruncatedPayload
   InvalidBufferLength(Int32)
   TrailingBytes(Int32)
+  InvalidFrameLimit(Int32)
+  DecoderClosed
 }
 
 ///|

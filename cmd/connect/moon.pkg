@@ -1,0 +1,10 @@
+import {
+  "Mr-Shi123/moonkeeper/client",
+  "moonbitlang/async",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+}
+
+supported_targets = "native"
+
+pkgtype(kind: "executable")

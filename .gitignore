@@ -3,6 +3,7 @@
 /.mooncakes/
 /.moonagent/
 /cmd/**/pkg.generated.mbti
+/integration/pkg.generated.mbti
 /.idea/
 /.vscode/
 .DS_Store

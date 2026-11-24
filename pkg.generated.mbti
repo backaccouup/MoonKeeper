@@ -21,6 +21,8 @@ pub suberror ProtocolError {
   TruncatedPayload
   InvalidBufferLength(Int32)
   TrailingBytes(Int32)
+  InvalidFrameLimit(Int32)
+  DecoderClosed
 }
 pub fn ProtocolError::to_repr(Self) -> @debug.Repr
 
@@ -32,6 +34,13 @@ pub struct ConnectResponse {
   password : Bytes?
   read_only : Bool
 }
+
+pub struct FrameDecoder {
+  // private fields
+}
+pub fn FrameDecoder::feed(Self, Bytes) -> Array[Bytes] raise ProtocolError
+pub fn FrameDecoder::finish(Self) -> Unit raise ProtocolError
+pub fn FrameDecoder::new(max_frame_size? : Int32) -> Self raise ProtocolError
 
 // Type aliases
 

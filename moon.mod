@@ -8,4 +8,10 @@ license = "Apache-2.0"
 
 keywords = [ "zookeeper", "client", "protocol" ]
 
-description = "ZooKeeper client groundwork for MoonBit: connection handshake codec"
+description = "ZooKeeper client for MoonBit: native TCP and connection handshake"
+
+preferred_target = "native"
+
+import {
+  "moonbitlang/async@0.20.3",
+}
