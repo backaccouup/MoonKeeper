@@ -75,6 +75,7 @@ pub struct Client {
   priv lock : @async.Mutex
   priv mut next_xid : Int32
   priv request_timeout_ms : Int32
+  priv max_frame_size : Int32
   priv mut current_state : ClientState
 }
 
@@ -174,6 +175,7 @@ pub async fn[T] with_client(
     lock: @async.Mutex::Mutex(),
     next_xid: 1,
     request_timeout_ms: options.request_timeout_ms,
+    max_frame_size: options.max_frame_size,
     current_state: Connected,
   }
   defer client.close()

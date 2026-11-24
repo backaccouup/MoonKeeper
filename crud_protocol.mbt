@@ -30,6 +30,17 @@ fn finish_node_request(out : @buffer.Buffer) -> Bytes raise ProtocolError {
 }
 
 ///|
+pub fn validate_request_frame_size(
+  wire : Bytes,
+  max_frame_size : Int32,
+) -> Unit raise ProtocolError {
+  guard wire.length() >= 4 else { raise TruncatedFrame }
+  guard wire.length() - 4 <= max_frame_size else {
+    raise FrameTooLarge(wire.length() - 4)
+  }
+}
+
+///|
 fn validate_node_request(
   xid : Int32,
   path : String,

@@ -28,6 +28,7 @@ pub suberror ClientError {
   Server(Int32)
   UnexpectedXid(Int32)
   InvalidResponse
+  OutcomeUnknown
 }
 pub fn ClientError::to_repr(Self) -> @debug.Repr
 
@@ -36,8 +37,12 @@ pub struct Client {
   // private fields
 }
 pub fn Client::close(Self) -> Unit
+pub async fn Client::create(Self, String, Bytes?, @moonkeeper.CreateOptions) -> String
+pub async fn Client::delete(Self, String, Int32) -> Unit
 pub async fn Client::exists(Self, String) -> @moonkeeper.Stat?
+pub async fn Client::get_data(Self, String) -> @moonkeeper.DataResult
 pub fn Client::session_info(Self) -> SessionInfo
+pub async fn Client::set_data(Self, String, Bytes?, Int32) -> @moonkeeper.Stat
 pub fn Client::state(Self) -> ClientState
 
 pub(all) struct ClientOptions {

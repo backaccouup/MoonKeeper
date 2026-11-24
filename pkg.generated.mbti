@@ -36,6 +36,8 @@ pub fn open_acl_unsafe() -> Array[Acl]
 
 pub fn validate_path(String) -> Unit raise ProtocolError
 
+pub fn validate_request_frame_size(Bytes, Int32) -> Unit raise ProtocolError
+
 // Errors
 #derive(@debug.Debug)
 pub suberror ProtocolError {

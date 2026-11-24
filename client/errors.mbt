@@ -21,6 +21,8 @@ pub suberror ClientError {
   Server(Int32)
   UnexpectedXid(Int32)
   InvalidResponse
+  /// A write may have reached the server; inspect state before retrying.
+  OutcomeUnknown
 }
 
 ///|
