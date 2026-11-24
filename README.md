@@ -1,5 +1,7 @@
 # MoonKeeper
 
+**简体中文** | [English](README.en.md)
+
 **面向 MoonBit 的 Apache ZooKeeper 原生客户端，正在逐步开发。**
 
 目标是让 MoonBit 应用直接接入 ZooKeeper，使用节点操作、配置监听、服务注册和会话管理。协议与客户端逻辑由 MoonBit 实现。
