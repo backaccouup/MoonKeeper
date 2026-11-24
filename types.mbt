@@ -35,3 +35,59 @@ pub extend Stat with @debug.Debug::{to_repr}
 
 ///|
 pub extend Stat with Eq::{equal, not_equal}
+
+///|
+#derive(Debug, Eq)
+pub(all) struct Acl {
+  permissions : Int32
+  scheme : String
+  id : String
+}
+
+///|
+pub extend Acl with @debug.Debug::{to_repr}
+
+///|
+pub extend Acl with Eq::{equal, not_equal}
+
+///|
+/// ZooKeeper's world:anyone ACL with all five permissions.
+pub fn open_acl_unsafe() -> Array[Acl] {
+  [{ permissions: 31, scheme: "world", id: "anyone", }]
+}
+
+///|
+#derive(Debug, Eq)
+pub(all) enum CreateMode {
+  Persistent
+}
+
+///|
+pub extend CreateMode with @debug.Debug::{to_repr}
+
+///|
+pub extend CreateMode with Eq::{equal, not_equal}
+
+///|
+pub(all) struct CreateOptions {
+  mode : CreateMode
+  acl : Array[Acl]
+}
+
+///|
+pub fn CreateOptions::new(mode : CreateMode, acl : Array[Acl]) -> CreateOptions {
+  { mode, acl, }
+}
+
+///|
+#derive(Debug, Eq)
+pub(all) struct DataResult {
+  data : Bytes?
+  stat : Stat
+}
+
+///|
+pub extend DataResult with @debug.Debug::{to_repr}
+
+///|
+pub extend DataResult with Eq::{equal, not_equal}

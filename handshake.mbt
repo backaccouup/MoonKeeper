@@ -17,6 +17,8 @@ pub suberror ProtocolError {
   InvalidFrameLimit(Int32)
   DecoderClosed
   InvalidPath(String)
+  InvalidVersion(Int32)
+  InvalidAcl(String)
   UnexpectedResponse(Int32)
   ServerError(Int32)
 }

@@ -8,13 +8,31 @@ import {
 // Values
 pub fn decode_connect_response(Bytes) -> ConnectResponse raise ProtocolError
 
+pub fn decode_create_response(Bytes) -> String raise ProtocolError
+
+pub fn decode_delete_response(Bytes) -> Unit raise ProtocolError
+
 pub fn decode_exists_response(Bytes) -> Stat? raise ProtocolError
+
+pub fn decode_get_data_response(Bytes) -> DataResult raise ProtocolError
 
 pub fn decode_reply_header(Bytes) -> ReplyHeader raise ProtocolError
 
+pub fn decode_set_data_response(Bytes) -> Stat raise ProtocolError
+
 pub fn encode_connect_request(Int32, read_only? : Bool) -> Bytes raise ProtocolError
 
+pub fn encode_create_request(Int32, String, Bytes?, CreateOptions) -> Bytes raise ProtocolError
+
+pub fn encode_delete_request(Int32, String, Int32) -> Bytes raise ProtocolError
+
 pub fn encode_exists_request(Int32, String) -> Bytes raise ProtocolError
+
+pub fn encode_get_data_request(Int32, String) -> Bytes raise ProtocolError
+
+pub fn encode_set_data_request(Int32, String, Bytes?, Int32) -> Bytes raise ProtocolError
+
+pub fn open_acl_unsafe() -> Array[Acl]
 
 pub fn validate_path(String) -> Unit raise ProtocolError
 
@@ -32,12 +50,24 @@ pub suberror ProtocolError {
   InvalidFrameLimit(Int32)
   DecoderClosed
   InvalidPath(String)
+  InvalidVersion(Int32)
+  InvalidAcl(String)
   UnexpectedResponse(Int32)
   ServerError(Int32)
 }
 pub fn ProtocolError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Eq, @debug.Debug)
+pub(all) struct Acl {
+  permissions : Int32
+  scheme : String
+  id : String
+}
+pub fn Acl::equal(Self, Self) -> Bool
+pub fn Acl::not_equal(Self, Self) -> Bool
+pub fn Acl::to_repr(Self) -> @debug.Repr
+
 pub struct ConnectResponse {
   protocol_version : Int32
   session_timeout_ms : Int32
@@ -45,6 +75,29 @@ pub struct ConnectResponse {
   password : Bytes?
   read_only : Bool
 }
+
+#derive(Eq, @debug.Debug)
+pub(all) enum CreateMode {
+  Persistent
+}
+pub fn CreateMode::equal(Self, Self) -> Bool
+pub fn CreateMode::not_equal(Self, Self) -> Bool
+pub fn CreateMode::to_repr(Self) -> @debug.Repr
+
+pub(all) struct CreateOptions {
+  mode : CreateMode
+  acl : Array[Acl]
+}
+pub fn CreateOptions::new(CreateMode, Array[Acl]) -> Self
+
+#derive(Eq, @debug.Debug)
+pub(all) struct DataResult {
+  data : Bytes?
+  stat : Stat
+}
+pub fn DataResult::equal(Self, Self) -> Bool
+pub fn DataResult::not_equal(Self, Self) -> Bool
+pub fn DataResult::to_repr(Self) -> @debug.Repr
 
 pub struct FrameDecoder {
   // private fields
