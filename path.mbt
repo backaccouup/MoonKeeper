@@ -24,3 +24,18 @@ pub fn validate_path(path : String) -> Unit raise ProtocolError {
     }
   }
 }
+
+///|
+/// Sequential creation validates the prefix as ZooKeeper does: a suffix
+/// will be appended by the server, so a final slash can be meaningful.
+pub fn validate_create_path(
+  path : String,
+  sequential : Bool,
+) -> Unit raise ProtocolError {
+  if sequential {
+    validate_path(path + "1")
+  } else {
+    validate_path(path)
+    guard path != "/" else { raise InvalidPath(path) }
+  }
+}

@@ -63,7 +63,12 @@ pub fn encode_create_request(
   data : Bytes?,
   options : CreateOptions,
 ) -> Bytes raise ProtocolError {
-  validate_node_request(xid, path, false)
+  guard xid > 0 else { raise UnexpectedResponse(xid) }
+  let sequential = match options.mode {
+    PersistentSequential | EphemeralSequential => true
+    _ => false
+  }
+  validate_create_path(path, sequential)
   guard !options.acl.is_empty() else {
     raise InvalidAcl("ACL must not be empty")
   }
@@ -86,6 +91,9 @@ pub fn encode_create_request(
   }
   match options.mode {
     Persistent => out.write_int_be(0)
+    Ephemeral => out.write_int_be(1)
+    PersistentSequential => out.write_int_be(2)
+    EphemeralSequential => out.write_int_be(3)
   }
   finish_node_request(out)
 }

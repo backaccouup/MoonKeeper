@@ -14,6 +14,10 @@ pub fn decode_delete_response(Bytes) -> Unit raise ProtocolError
 
 pub fn decode_exists_response(Bytes) -> Stat? raise ProtocolError
 
+pub fn decode_get_children_response(Bytes) -> Array[String] raise ProtocolError
+
+pub fn decode_get_children_with_stat_response(Bytes) -> ChildrenResult raise ProtocolError
+
 pub fn decode_get_data_response(Bytes) -> DataResult raise ProtocolError
 
 pub fn decode_reply_header(Bytes) -> ReplyHeader raise ProtocolError
@@ -28,11 +32,17 @@ pub fn encode_delete_request(Int32, String, Int32) -> Bytes raise ProtocolError
 
 pub fn encode_exists_request(Int32, String) -> Bytes raise ProtocolError
 
+pub fn encode_get_children_request(Int32, String) -> Bytes raise ProtocolError
+
+pub fn encode_get_children_with_stat_request(Int32, String) -> Bytes raise ProtocolError
+
 pub fn encode_get_data_request(Int32, String) -> Bytes raise ProtocolError
 
 pub fn encode_set_data_request(Int32, String, Bytes?, Int32) -> Bytes raise ProtocolError
 
 pub fn open_acl_unsafe() -> Array[Acl]
+
+pub fn validate_create_path(String, Bool) -> Unit raise ProtocolError
 
 pub fn validate_path(String) -> Unit raise ProtocolError
 
@@ -70,6 +80,15 @@ pub fn Acl::equal(Self, Self) -> Bool
 pub fn Acl::not_equal(Self, Self) -> Bool
 pub fn Acl::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
+pub(all) struct ChildrenResult {
+  children : Array[String]
+  stat : Stat
+}
+pub fn ChildrenResult::equal(Self, Self) -> Bool
+pub fn ChildrenResult::not_equal(Self, Self) -> Bool
+pub fn ChildrenResult::to_repr(Self) -> @debug.Repr
+
 pub struct ConnectResponse {
   protocol_version : Int32
   session_timeout_ms : Int32
@@ -81,6 +100,9 @@ pub struct ConnectResponse {
 #derive(Eq, @debug.Debug)
 pub(all) enum CreateMode {
   Persistent
+  Ephemeral
+  PersistentSequential
+  EphemeralSequential
 }
 pub fn CreateMode::equal(Self, Self) -> Bool
 pub fn CreateMode::not_equal(Self, Self) -> Bool

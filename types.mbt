@@ -60,6 +60,9 @@ pub fn open_acl_unsafe() -> Array[Acl] {
 #derive(Debug, Eq)
 pub(all) enum CreateMode {
   Persistent
+  Ephemeral
+  PersistentSequential
+  EphemeralSequential
 }
 
 ///|
@@ -91,3 +94,16 @@ pub extend DataResult with @debug.Debug::{to_repr}
 
 ///|
 pub extend DataResult with Eq::{equal, not_equal}
+
+///|
+#derive(Debug, Eq)
+pub(all) struct ChildrenResult {
+  children : Array[String]
+  stat : Stat
+}
+
+///|
+pub extend ChildrenResult with @debug.Debug::{to_repr}
+
+///|
+pub extend ChildrenResult with Eq::{equal, not_equal}
