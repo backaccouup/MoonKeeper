@@ -18,9 +18,9 @@
 - 截断、负长度、超大帧、字段长度错误及多余字节检查。
 - 增量分帧，支持任意分片和粘包，在分配正文之前检查长度，并检测 EOF 半帧。
 - 单地址 native TCP、连接与握手总超时、协商结果校验，以及作用域退出、异常和取消后的连接关闭。
-- 20 项可移植协议测试、9 项本地 TCP/客户端测试，以及单独启用的真实 ZooKeeper 集成测试。
+- 25 项可移植协议测试、12 项本地 TCP/客户端测试，以及单独启用的真实 ZooKeeper 集成测试。
 
-**当前仅完成连接与握手。** 请求调度、心跳、节点操作、Watch、认证、事务和会话恢复仍待实现。作用域结束时关闭 TCP，暂不发送 `closeSession`；服务端会话随后按协商超时过期。长时间保留回调不会自动维持会话。尚未发布到 Mooncakes。
+**当前支持连接、握手和串行的 `exists` 节点查询。** 并发请求分发、心跳、创建/读写节点、Watch、认证、事务和会话恢复仍待实现。作用域结束时关闭 TCP，暂不发送 `closeSession`；服务端会话随后按协商超时过期。长时间保留回调不会自动维持会话。尚未发布到 Mooncakes。
 
 ## 本地运行
 
@@ -95,6 +95,8 @@ let options = @client.ClientOptions::new(
 @client.with_client(options, client => {
   let info = client.session_info()
   println(info.session_id)
+  let root = client.exists("/")
+  println(root)
 })
 ```
 
@@ -109,7 +111,9 @@ let options = @client.ClientOptions::new(
 | `max_pending_requests` | 256 | 为后续请求分发保留，当前无业务请求队列 |
 | `event_buffer_capacity` | 256 | 为后续通知管理保留，当前无事件队列 |
 
-`ClientError` 区分选项错误、传输失败、握手超时、流关闭、协议错误和会话拒绝。客户端验证协议版本、协商超时、非零会话 ID、16 字节密码和只读许可；错误不包含原始响应或密码。当前模块命名空间仍为 `Mr-Shi123/moonkeeper`，与 GitHub 提交账号分别管理。
+`Client::exists(path)` 返回完整 `Stat?`：仅服务端的 `NoNode` 映射为 `None`，其他服务端错误仍抛出。`Client::state()` 可查询状态，`Client::close()` 可重复调用并关闭 TCP。当前请求串行处理，每个连接使用递增正数 xid；读请求超时后关闭连接并进入 `Disconnected`，不等于确认会话已经过期。详见 [失败与生命周期语义](docs/semantics.md)。
+
+`ClientError` 区分选项错误、传输失败、握手超时、请求超时、协议错误、服务端错误、会话拒绝和关闭状态。客户端验证协议版本、协商超时、非零会话 ID、16 字节密码和只读许可；错误不包含原始响应或密码。当前模块命名空间仍为 `Mr-Shi123/moonkeeper`，与 GitHub 提交账号分别管理。
 
 ### 可移植协议
 
@@ -150,7 +154,7 @@ scripts/             PowerShell / Bash 集成入口
 | --- | --- | --- |
 | 1 | 项目基础、握手编解码、测试与离线示例 | 已实现 |
 | 2 | 原生 TCP、增量分帧与真实服务器握手 | 已实现 |
-| 3 | 请求 ID、响应分发、心跳与超时 | 待开发 |
+| 3 | 请求 ID、响应分发、心跳与超时 | 进行中：串行 exists 与请求超时 |
 | 4 | 创建、读取、修改、删除节点 | 待开发 |
 | 5 | 子节点、状态、版本条件及临时/顺序节点 | 待开发 |
 | 6 | Watch 注册、通知分发及取消边界 | 待开发 |

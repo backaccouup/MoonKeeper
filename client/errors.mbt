@@ -14,6 +14,13 @@ pub suberror ClientError {
   UnsupportedProtocol(Int32)
   InvalidSession(String)
   ReadOnlyNotAllowed
+  RequestTimeout
+  QueueFull
+  Closed
+  Disconnected
+  Server(Int32)
+  UnexpectedXid(Int32)
+  InvalidResponse
 }
 
 ///|

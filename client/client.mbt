@@ -71,11 +71,46 @@ pub extend SessionInfo with Eq::{equal, not_equal}
 ///|
 pub struct Client {
   priv info : SessionInfo
+  priv socket : @socket.Tcp
+  priv lock : @async.Mutex
+  priv mut next_xid : Int32
+  priv request_timeout_ms : Int32
+  priv mut current_state : ClientState
 }
 
 ///|
 pub fn Client::session_info(self : Client) -> SessionInfo {
   self.info
+}
+
+///|
+#derive(Debug, Eq)
+pub(all) enum ClientState {
+  Connecting
+  Connected
+  Disconnected
+  Expired
+  AuthFailed
+  Closed
+}
+
+///|
+pub extend ClientState with @debug.Debug::{to_repr}
+
+///|
+pub extend ClientState with Eq::{equal, not_equal}
+
+///|
+pub fn Client::state(self : Client) -> ClientState {
+  self.current_state
+}
+
+///|
+pub fn Client::close(self : Client) -> Unit {
+  if self.current_state != Closed {
+    self.current_state = Closed
+    self.socket.close()
+  }
 }
 
 ///|
@@ -133,5 +168,14 @@ pub async fn[T] with_client(
       }
   }
   // Keep user code outside the transport error handler and handshake deadline.
-  body({ info, })
+  let client = Client::{
+    info,
+    socket: connection.unwrap(),
+    lock: @async.Mutex::Mutex(),
+    next_xid: 1,
+    request_timeout_ms: options.request_timeout_ms,
+    current_state: Connected,
+  }
+  defer client.close()
+  body(client)
 }

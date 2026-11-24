@@ -18,9 +18,9 @@ Implemented so far:
 - Checking for truncation, negative lengths, oversized frames, invalid field lengths, and trailing bytes.
 - Incremental framing for fragmented and concatenated input, validating lengths before buffering payloads and detecting incomplete frames at EOF.
 - Single-address native TCP, a combined connection/handshake deadline, negotiation validation, and connection cleanup on normal exit, errors, or cancellation.
-- 20 portable protocol tests, 9 local TCP/client tests, and explicitly enabled real ZooKeeper integration tests.
+- 25 portable protocol tests, 12 local TCP/client tests, and explicitly enabled real ZooKeeper integration tests.
 
-**Only connection establishment and the handshake are implemented so far.** Request dispatch, heartbeats, znode operations, watches, authentication, transactions, and session recovery are still planned. Leaving the scope closes TCP but does not yet send `closeSession`; the server expires the session after its negotiated timeout. Keeping the callback alive does not maintain the session automatically. The project has not been published to Mooncakes.
+**Connection establishment, the handshake, and serial `exists` queries are implemented.** Concurrent dispatch, heartbeats, node writes, watches, authentication, transactions, and session recovery remain planned. Leaving the scope closes TCP but does not yet send `closeSession`; the server expires the session after its negotiated timeout. Keeping the callback alive does not maintain the session automatically. The project has not been published to Mooncakes.
 
 ## Running locally
 
@@ -95,6 +95,8 @@ let options = @client.ClientOptions::new(
 @client.with_client(options, client => {
   let info = client.session_info()
   println(info.session_id)
+  let root = client.exists("/")
+  println(root)
 })
 ```
 
@@ -109,7 +111,9 @@ let options = @client.ClientOptions::new(
 | `max_pending_requests` | 256 | Reserved for request dispatch; no application request queue exists yet |
 | `event_buffer_capacity` | 256 | Reserved for notifications; no event queue exists yet |
 
-`ClientError` distinguishes invalid options, transport failures, handshake timeout, EOF, protocol errors, and session rejection. The client validates the protocol version, negotiated timeout, nonzero session ID, 16-byte password, and read-only permission. Errors contain neither raw responses nor passwords. The module namespace remains `Mr-Shi123/moonkeeper` and is managed separately from the GitHub commit identity.
+`Client::exists(path)` returns `Stat?`. Only the server's `NoNode` becomes `None`; other server errors are raised. `Client::state()` exposes the state; `Client::close()` is idempotent and closes TCP. Requests are currently serialized by a mutex and use increasing positive xids. A read timeout closes this connection and marks it `Disconnected`, which does not prove that the ZooKeeper session expired. See [failure and lifecycle semantics](docs/semantics.md).
+
+`ClientError` distinguishes invalid options, transport failures, handshake or request timeouts, protocol and server errors, session rejection, and closed state. The client validates the protocol version, negotiated timeout, nonzero session ID, 16-byte password, and read-only permission. Errors contain neither raw responses nor passwords. The module namespace remains `Mr-Shi123/moonkeeper` and is managed separately from the GitHub commit identity.
 
 ### Portable protocol
 
@@ -150,7 +154,7 @@ Ten feature increments extend the original protocol prototype. Documentation mai
 | --- | --- | --- |
 | 1 | Project setup, handshake codec, tests, and offline example | Implemented |
 | 2 | Native TCP, incremental framing, and handshake with a real server | Implemented |
-| 3 | Request IDs, response dispatch, heartbeats, and timeouts | Planned |
+| 3 | Request IDs, response dispatch, heartbeats, and timeouts | In progress: serial exists and request timeout |
 | 4 | Create, read, update, and delete znodes | Planned |
 | 5 | Children, stat metadata, version checks, and ephemeral/sequential nodes | Planned |
 | 6 | Watch registration, notification dispatch, and cancellation semantics | Planned |

@@ -21,6 +21,13 @@ pub suberror ClientError {
   UnsupportedProtocol(Int32)
   InvalidSession(String)
   ReadOnlyNotAllowed
+  RequestTimeout
+  QueueFull
+  Closed
+  Disconnected
+  Server(Int32)
+  UnexpectedXid(Int32)
+  InvalidResponse
 }
 pub fn ClientError::to_repr(Self) -> @debug.Repr
 
@@ -28,7 +35,10 @@ pub fn ClientError::to_repr(Self) -> @debug.Repr
 pub struct Client {
   // private fields
 }
+pub fn Client::close(Self) -> Unit
+pub async fn Client::exists(Self, String) -> @moonkeeper.Stat?
 pub fn Client::session_info(Self) -> SessionInfo
+pub fn Client::state(Self) -> ClientState
 
 pub(all) struct ClientOptions {
   endpoint : Endpoint
@@ -40,6 +50,19 @@ pub(all) struct ClientOptions {
   read_only : Bool
 }
 pub fn ClientOptions::new(Endpoint, session_timeout_ms? : Int32, request_timeout_ms? : Int32, max_frame_size? : Int32, max_pending_requests? : Int32, event_buffer_capacity? : Int32, read_only? : Bool) -> Self
+
+#derive(Eq, @debug.Debug)
+pub(all) enum ClientState {
+  Connecting
+  Connected
+  Disconnected
+  Expired
+  AuthFailed
+  Closed
+}
+pub fn ClientState::equal(Self, Self) -> Bool
+pub fn ClientState::not_equal(Self, Self) -> Bool
+pub fn ClientState::to_repr(Self) -> @debug.Repr
 
 #derive(Eq, @debug.Debug)
 pub(all) struct Endpoint {
