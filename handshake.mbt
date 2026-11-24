@@ -16,6 +16,9 @@ pub suberror ProtocolError {
   TrailingBytes(Int32)
   InvalidFrameLimit(Int32)
   DecoderClosed
+  InvalidPath(String)
+  UnexpectedResponse(Int32)
+  ServerError(Int32)
 }
 
 ///|

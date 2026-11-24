@@ -8,7 +8,15 @@ import {
 // Values
 pub fn decode_connect_response(Bytes) -> ConnectResponse raise ProtocolError
 
+pub fn decode_exists_response(Bytes) -> Stat? raise ProtocolError
+
+pub fn decode_reply_header(Bytes) -> ReplyHeader raise ProtocolError
+
 pub fn encode_connect_request(Int32, read_only? : Bool) -> Bytes raise ProtocolError
+
+pub fn encode_exists_request(Int32, String) -> Bytes raise ProtocolError
+
+pub fn validate_path(String) -> Unit raise ProtocolError
 
 // Errors
 #derive(@debug.Debug)
@@ -23,6 +31,9 @@ pub suberror ProtocolError {
   TrailingBytes(Int32)
   InvalidFrameLimit(Int32)
   DecoderClosed
+  InvalidPath(String)
+  UnexpectedResponse(Int32)
+  ServerError(Int32)
 }
 pub fn ProtocolError::to_repr(Self) -> @debug.Repr
 
@@ -41,6 +52,35 @@ pub struct FrameDecoder {
 pub fn FrameDecoder::feed(Self, Bytes) -> Array[Bytes] raise ProtocolError
 pub fn FrameDecoder::finish(Self) -> Unit raise ProtocolError
 pub fn FrameDecoder::new(max_frame_size? : Int32) -> Self raise ProtocolError
+
+pub(all) struct ReplyHeader {
+  xid : Int32
+  zxid : Int64
+  err : Int32
+}
+
+pub(all) struct RequestHeader {
+  xid : Int32
+  op : Int32
+}
+
+#derive(Eq, @debug.Debug)
+pub(all) struct Stat {
+  czxid : Int64
+  mzxid : Int64
+  ctime : Int64
+  mtime : Int64
+  version : Int32
+  cversion : Int32
+  aversion : Int32
+  ephemeral_owner : Int64
+  data_length : Int32
+  num_children : Int32
+  pzxid : Int64
+}
+pub fn Stat::equal(Self, Self) -> Bool
+pub fn Stat::not_equal(Self, Self) -> Bool
+pub fn Stat::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 
