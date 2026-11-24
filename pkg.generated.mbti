@@ -1,0 +1,38 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Mr-Shi123/moonkeeper"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decode_connect_response(Bytes) -> ConnectResponse raise ProtocolError
+
+pub fn encode_connect_request(Int32, read_only? : Bool) -> Bytes raise ProtocolError
+
+// Errors
+#derive(@debug.Debug)
+pub suberror ProtocolError {
+  InvalidTimeout(Int32)
+  TruncatedFrame
+  InvalidFrameLength(Int32)
+  FrameTooLarge(Int32)
+  FrameLengthMismatch(Int32, Int32)
+  TruncatedPayload
+  InvalidBufferLength(Int32)
+  TrailingBytes(Int32)
+}
+pub fn ProtocolError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct ConnectResponse {
+  protocol_version : Int32
+  session_timeout_ms : Int32
+  session_id : Int64
+  password : Bytes?
+  read_only : Bool
+}
+
+// Type aliases
+
+// Traits

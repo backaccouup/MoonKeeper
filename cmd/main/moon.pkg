@@ -1,0 +1,5 @@
+import {
+  "Mr-Shi123/moonkeeper",
+}
+
+pkgtype(kind: "executable")

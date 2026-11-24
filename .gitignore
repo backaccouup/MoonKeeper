@@ -1,0 +1,12 @@
+/_build/
+/target/
+/.mooncakes/
+/.moonagent/
+/cmd/**/pkg.generated.mbti
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
