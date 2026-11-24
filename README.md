@@ -20,7 +20,7 @@
 - 单地址 native TCP、连接与握手总超时、协商结果校验，以及作用域退出、异常和取消后的连接关闭。
 - 可移植协议测试、本地 TCP/客户端测试，以及单独启用的真实 ZooKeeper 集成测试。
 
-**当前支持连接、握手及串行的持久节点 CRUD。** 并发请求分发、心跳、Watch、认证、事务和会话恢复仍待实现。作用域结束时关闭 TCP，暂不发送 `closeSession`；服务端会话随后按协商超时过期。长时间保留回调不会自动维持会话。尚未发布到 Mooncakes。
+**当前支持连接、握手、四种基本节点创建模式及串行节点读写。** 并发请求分发、心跳、Watch、认证、事务和会话恢复仍待实现。作用域结束时关闭 TCP，暂不发送 `closeSession`；服务端会话随后按协商超时过期。长时间保留回调不会自动维持会话。尚未发布到 Mooncakes。
 
 ## 本地运行
 
@@ -122,6 +122,8 @@ let options = @client.ClientOptions::new(
 
 `Client::state()` 可查询状态，`Client::close()` 可重复调用并关闭 TCP。请求串行处理，每个连接使用递增正数 xid。读请求超时后关闭连接并进入 `Disconnected`；写请求可能发出后失败时返回 `OutcomeUnknown`，调用方应先核对服务器状态再决定是否重试。详见 [失败与生命周期语义](docs/semantics.md)。示例还需在包配置中导入 `"Mr-Shi123/moonkeeper"`。
 
+`CreateMode` 支持 `Persistent`、`Ephemeral`、`PersistentSequential`、`EphemeralSequential`。顺序节点允许以 `/parent/` 作为创建前缀；`create` 返回服务端生成的完整路径，不能自行推算序号。`get_children(path)` 返回直接子节点的名称数组；`get_children_with_stat(path)` 额外返回父节点的完整 `Stat`。子节点顺序由服务端决定，调用方需要顺序时自行排序。临时节点的 `Stat.ephemeral_owner` 是创建它的会话 ID，临时节点不能拥有子节点。
+
 `ClientError` 区分选项错误、传输失败、握手超时、请求超时、协议错误、服务端错误、会话拒绝和关闭状态。客户端验证协议版本、协商超时、非零会话 ID、16 字节密码和只读许可；错误不包含原始响应或密码。当前模块命名空间仍为 `Mr-Shi123/moonkeeper`，与 GitHub 提交账号分别管理。
 
 ### 可移植协议
@@ -165,7 +167,7 @@ scripts/             PowerShell / Bash 集成入口
 | 2 | 原生 TCP、增量分帧与真实服务器握手 | 已实现 |
 | 3 | 请求 ID、响应分发、心跳与超时 | 进行中：串行 exists 与请求超时 |
 | 4 | 创建、读取、修改、删除持久节点 | 已实现 |
-| 5 | 子节点、状态、版本条件及临时/顺序节点 | 待开发 |
+| 5 | 子节点、状态、版本条件及临时/顺序节点 | 已实现基础能力 |
 | 6 | Watch 注册、通知分发及取消边界 | 待开发 |
 | 7 | ACL 与 Digest 认证 | 待开发 |
 | 8 | 原子多操作 `multi` 与结构化服务错误 | 待开发 |

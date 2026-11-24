@@ -8,7 +8,7 @@ license = "Apache-2.0"
 
 keywords = [ "zookeeper", "client", "protocol" ]
 
-description = "ZooKeeper client for MoonBit: native TCP and connection handshake"
+description = "ZooKeeper client for MoonBit: native TCP and znode operations"
 
 preferred_target = "native"
 

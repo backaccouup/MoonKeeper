@@ -21,3 +21,13 @@ Current native client calls are serialized on a single TCP connection. Each oper
 Version `-1` bypasses the version check for set/delete; nonnegative versions require a match, and less than `-1` fails locally. Server failures such as `NoNode`, `NodeExists`, `BadVersion`, and `NotEmpty` remain `ClientError::Server(code)`. A failed write before any bytes can be sent is an ordinary local error. Once writing begins, a lost connection, timeout, or invalid response becomes `OutcomeUnknown`: the operation may have committed. The client closes that connection; callers should inspect server state with a new connection before retrying.
 
 修改和删除的 `version=-1` 不检查版本；非负值要求匹配；小于 -1 的值在本地拒绝。`NoNode`、`NodeExists`、`BadVersion` 和 `NotEmpty` 等服务端错误保留为 `ClientError::Server(code)`。发送前的失败是确定的本地错误。开始发送后，断线、超时或无效响应返回 `OutcomeUnknown`，操作可能已经提交。客户端随后关闭该连接；重试前应使用新连接核对服务端状态。
+
+## Children and ephemeral sessions / 子节点与临时会话
+
+`get_children` uses `getChildren` and returns direct child names in server order. `get_children_with_stat` uses `getChildren2` and includes the parent's full `Stat`. Neither method sorts the names or installs a watch. Sequential creation accepts a prefix ending in `/`; the returned path is always the server's actual path. The `Ephemeral` and `EphemeralSequential` flags attach the node to the current server session. ZooKeeper rejects children of ephemeral nodes.
+
+`get_children` 返回服务端顺序的直接子节点名；`get_children_with_stat` 还返回父节点的完整 `Stat`。两者均不排序，也不注册 Watch。顺序创建可接受以 `/` 结尾的前缀，返回路径以服务端结果为准。两种临时节点模式将节点绑定到当前服务端会话，服务端禁止临时节点拥有子节点。
+
+A brief TCP disconnection alone does not prove session expiry: a session might still be valid and its ephemeral nodes might still exist. This client currently cannot resume it. `close()` only closes TCP; it does not send `closeSession`. Ephemeral nodes disappear when ZooKeeper expires the session after the negotiated timeout, rather than immediately on local close. Persistent nodes survive that expiry. Applications must not treat an ephemeral node as a prompt failure detector.
+
+短暂 TCP 断连不代表会话已过期，临时节点可能仍在；当前客户端也不能恢复该会话。`close()` 只关闭 TCP，不发送 `closeSession`。临时节点在 ZooKeeper 按协商超时确认会话过期后删除，并非本地关闭时立即删除；持久节点继续保留。应用不能把临时节点当成立即生效的故障探测信号。
