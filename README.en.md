@@ -20,7 +20,7 @@ Implemented so far:
 - Single-address native TCP, a combined connection/handshake deadline, negotiation validation, and connection cleanup on normal exit, errors, or cancellation.
 - Portable protocol tests, local TCP/client tests, and explicitly enabled real ZooKeeper integration tests.
 
-**Connection establishment, the handshake, four basic create modes, and serial znode operations are implemented.** Concurrent dispatch, heartbeats, watches, authentication, transactions, and session recovery remain planned. Leaving the scope closes TCP but does not yet send `closeSession`; the server expires the session after its negotiated timeout. Keeping the callback alive does not maintain the session automatically. The project has not been published to Mooncakes.
+**Connection establishment, the handshake, four basic create modes, serial znode operations, and one-shot watches are implemented.** Idle connections send heartbeats. Concurrent request dispatch, automatic reconnection, authentication, and transactions remain planned. Leaving the scope closes TCP but does not yet send `closeSession`; the server expires the session after its negotiated timeout. The project has not been published to Mooncakes.
 
 ## Running locally
 
@@ -116,13 +116,15 @@ let options = @client.ClientOptions::new(
 | `max_frame_size` | 1048576 | Request and response payload limit; the client accepts 45–1048576 |
 | `read_only` | false | Allow a read-only server |
 | `max_pending_requests` | 256 | Reserved for request dispatch; no application request queue exists yet |
-| `event_buffer_capacity` | 256 | Reserved for notifications; no event queue exists yet |
+| `event_buffer_capacity` | 256 | Maximum queued watch events; affected subscriptions report `WatchOverflow` when full |
 
 `Client::exists(path)` returns `Stat?`; only server `NoNode` becomes `None`. `create` returns the created path, `get_data` returns `Bytes?` and the full `Stat`, `set_data` returns the updated `Stat`, and `delete` returns unit. Null data and empty bytes remain distinct. `CreateOptions` requires an explicit ACL; `open_acl_unsafe()` grants all permissions to `world:anyone` and is only suitable for unrestricted nodes. Only `Persistent` is supported. Version `-1` bypasses the version condition; nonnegative versions must match; values below `-1` are rejected locally. Other server errors retain their codes. Import `"Mr-Shi123/moonkeeper"` alongside the client package for these types.
 
 `Client::state()` exposes the state; `Client::close()` is idempotent and closes TCP. Requests are serialized by a mutex and use increasing positive xids. A read timeout closes this connection and marks it `Disconnected`. If a write may have been sent before failure, `OutcomeUnknown` tells callers to inspect server state before retrying. See [failure and lifecycle semantics](docs/semantics.md).
 
 `CreateMode` supports `Persistent`, `Ephemeral`, `PersistentSequential`, and `EphemeralSequential`. A sequential prefix may end in `/`, such as `/parent/`; `create` returns the full path assigned by the server. `get_children(path)` returns direct child names, while `get_children_with_stat(path)` also returns the parent's full `Stat`. Child order is not guaranteed; sort it in the application if needed. An ephemeral node's `Stat.ephemeral_owner` identifies the creating session, and ephemeral nodes cannot have children.
+
+`watch_exists(path)`, `watch_data(path)`, and `watch_children(path)` return a read result and a `Watch`. Call `watch.next_event()` for one notification, then read and register again. `watch.cancel()` only stops local consumption; it does not send `removeWatches`. `client.next_state_event()` reports session state separately from node changes. A full event buffer raises `WatchOverflow` for affected subscriptions; read and register again. See [watch semantics](docs/semantics.md).
 
 `ClientError` distinguishes invalid options, transport failures, handshake or request timeouts, protocol and server errors, session rejection, and closed state. The client validates the protocol version, negotiated timeout, nonzero session ID, 16-byte password, and read-only permission. Errors contain neither raw responses nor passwords. The module namespace remains `Mr-Shi123/moonkeeper` and is managed separately from the GitHub commit identity.
 
@@ -165,10 +167,10 @@ Ten feature increments extend the original protocol prototype. Documentation mai
 | --- | --- | --- |
 | 1 | Project setup, handshake codec, tests, and offline example | Implemented |
 | 2 | Native TCP, incremental framing, and handshake with a real server | Implemented |
-| 3 | Request IDs, response dispatch, heartbeats, and timeouts | In progress: serial exists and request timeout |
+| 3 | Request IDs, response dispatch, heartbeats, and timeouts | In progress: serial dispatch, heartbeats, and request timeout |
 | 4 | Create, read, update, and delete persistent znodes | Implemented |
 | 5 | Children, stat metadata, version checks, and ephemeral/sequential nodes | Basic functionality implemented |
-| 6 | Watch registration, notification dispatch, and cancellation semantics | Planned |
+| 6 | Watch registration, notification dispatch, and cancellation semantics | One-shot watches implemented |
 | 7 | ACLs and Digest authentication | Planned |
 | 8 | Atomic `multi` operations and structured server errors | Planned |
 | 9 | Reconnection across multiple addresses, session recovery, and failure semantics | Planned |

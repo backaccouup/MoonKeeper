@@ -148,3 +148,36 @@ async test "invalid version and full frame limit fail before any write" {
     },
   )
 }
+
+///|
+async test "mismatched write response is an unknown outcome" {
+  with_peer(
+    conn => {
+      ignore(conn.read_exactly(49))
+      conn.write(fixture())
+      let size = match conn.read_exactly(4) {
+        [i32be(n)] => n
+        _ => fail("request length")
+      }
+      ignore(conn.read_exactly(size))
+      let reply = @buffer.Buffer()
+      reply.write_int_be(16 + 68)
+      reply.write_int_be(999)
+      reply.write_int64_be(1L)
+      reply.write_int_be(0)
+      reply.write_bytes(stat_fixture(1))
+      conn.write(reply.to_bytes())
+    },
+    endpoint => {
+      @client.with_client(@client.ClientOptions::new(endpoint), client => {
+        try {
+          ignore(client.set_data("/x", Some(b"v"), -1))
+          fail("expected unknown outcome")
+        } catch {
+          @client.ClientError::OutcomeUnknown => ()
+          err => fail("unexpected: \{err}")
+        }
+      })
+    },
+  )
+}

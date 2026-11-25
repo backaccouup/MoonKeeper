@@ -29,6 +29,7 @@ pub suberror ClientError {
   UnexpectedXid(Int32)
   InvalidResponse
   OutcomeUnknown
+  WatchOverflow
 }
 pub fn ClientError::to_repr(Self) -> @debug.Repr
 
@@ -43,9 +44,13 @@ pub async fn Client::exists(Self, String) -> @moonkeeper.Stat?
 pub async fn Client::get_children(Self, String) -> Array[String]
 pub async fn Client::get_children_with_stat(Self, String) -> @moonkeeper.ChildrenResult
 pub async fn Client::get_data(Self, String) -> @moonkeeper.DataResult
+pub async fn Client::next_state_event(Self) -> ClientState?
 pub fn Client::session_info(Self) -> SessionInfo
 pub async fn Client::set_data(Self, String, Bytes?, Int32) -> @moonkeeper.Stat
 pub fn Client::state(Self) -> ClientState
+pub async fn Client::watch_children(Self, String) -> (@moonkeeper.ChildrenResult, Watch)
+pub async fn Client::watch_data(Self, String) -> (@moonkeeper.DataResult, Watch)
+pub async fn Client::watch_exists(Self, String) -> (@moonkeeper.Stat?, Watch)
 
 pub(all) struct ClientOptions {
   endpoint : Endpoint
@@ -90,6 +95,12 @@ pub struct SessionInfo {
 pub fn SessionInfo::equal(Self, Self) -> Bool
 pub fn SessionInfo::not_equal(Self, Self) -> Bool
 pub fn SessionInfo::to_repr(Self) -> @debug.Repr
+
+pub struct Watch {
+  // private fields
+}
+pub fn Watch::cancel(Self) -> Unit
+pub async fn Watch::next_event(Self) -> @moonkeeper.WatchEvent?
 
 // Type aliases
 

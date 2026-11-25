@@ -24,6 +24,8 @@ pub fn decode_reply_header(Bytes) -> ReplyHeader raise ProtocolError
 
 pub fn decode_set_data_response(Bytes) -> Stat raise ProtocolError
 
+pub fn decode_watch_notification(Bytes) -> WatchNotice raise ProtocolError
+
 pub fn encode_connect_request(Int32, read_only? : Bool) -> Bytes raise ProtocolError
 
 pub fn encode_create_request(Int32, String, Bytes?, CreateOptions) -> Bytes raise ProtocolError
@@ -39,6 +41,12 @@ pub fn encode_get_children_with_stat_request(Int32, String) -> Bytes raise Proto
 pub fn encode_get_data_request(Int32, String) -> Bytes raise ProtocolError
 
 pub fn encode_set_data_request(Int32, String, Bytes?, Int32) -> Bytes raise ProtocolError
+
+pub fn encode_watch_children_request(Int32, String) -> Bytes raise ProtocolError
+
+pub fn encode_watch_data_request(Int32, String) -> Bytes raise ProtocolError
+
+pub fn encode_watch_exists_request(Int32, String) -> Bytes raise ProtocolError
 
 pub fn open_acl_unsafe() -> Array[Acl]
 
@@ -158,6 +166,35 @@ pub(all) struct Stat {
 pub fn Stat::equal(Self, Self) -> Bool
 pub fn Stat::not_equal(Self, Self) -> Bool
 pub fn Stat::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) struct WatchEvent {
+  kind : WatchEventType
+  path : String
+}
+pub fn WatchEvent::equal(Self, Self) -> Bool
+pub fn WatchEvent::not_equal(Self, Self) -> Bool
+pub fn WatchEvent::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) enum WatchEventType {
+  NodeCreated
+  NodeDeleted
+  NodeDataChanged
+  NodeChildrenChanged
+}
+pub fn WatchEventType::equal(Self, Self) -> Bool
+pub fn WatchEventType::not_equal(Self, Self) -> Bool
+pub fn WatchEventType::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) enum WatchNotice {
+  Node(WatchEvent)
+  State(Int32)
+}
+pub fn WatchNotice::equal(Self, Self) -> Bool
+pub fn WatchNotice::not_equal(Self, Self) -> Bool
+pub fn WatchNotice::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

@@ -20,8 +20,8 @@ pub fn Endpoint::new(host : String, port~ : Int32 = 2181) -> Endpoint {
 }
 
 ///|
-/// Request timeout bounds connection establishment and the handshake together.
-/// Pending-request and event limits are reserved for the upcoming dispatcher.
+/// Request timeout bounds connection establishment and each request.
+/// Requests remain serial; event_buffer_capacity bounds queued watch events.
 pub(all) struct ClientOptions {
   endpoint : Endpoint
   session_timeout_ms : Int32
@@ -76,6 +76,16 @@ pub struct Client {
   priv mut next_xid : Int32
   priv request_timeout_ms : Int32
   priv max_frame_size : Int32
+  priv event_buffer_capacity : Int32
+  priv mut buffered_events : Int32
+  priv mut watches : Array[Watch]
+  priv mut response_slot : @aqueue.Queue[Bytes]?
+  priv mut response_xid : Int32
+  priv mut pending_registration : Watch?
+  priv state_events : @aqueue.Queue[ClientState]
+  priv mut last_receive_ms : Int64
+  priv mut reader_task : @async.Task[Unit]?
+  priv mut heartbeat_task : @async.Task[Unit]?
   priv mut current_state : ClientState
 }
 
@@ -110,7 +120,23 @@ pub fn Client::state(self : Client) -> ClientState {
 pub fn Client::close(self : Client) -> Unit {
   if self.current_state != Closed {
     self.current_state = Closed
-    self.socket.close()
+    if self.reader_task is Some(task) {
+      task.cancel()
+    }
+    if self.heartbeat_task is Some(task) {
+      task.cancel()
+    }
+    if self.reader_task is None {
+      self.socket.close()
+    }
+    if self.response_slot is Some(slot) {
+      slot.close(error=ClientError::Closed)
+    }
+    self.response_slot = None
+    self.pending_registration = None
+    self.close_watches()
+    ignore(self.state_events.try_put(Closed) catch { _ => false })
+    self.state_events.close()
   }
 }
 
@@ -138,8 +164,8 @@ fn validate_options(options : ClientOptions) -> Unit raise ClientError {
 
 ///|
 /// Establish a new session, invoke `body`, then close TCP on every exit path.
-/// Callback errors and cancellation propagate unchanged. No heartbeat, reconnect,
-/// or closeSession request is implemented yet; the server expires the session later.
+/// Callback errors and cancellation propagate unchanged. Heartbeats keep idle
+/// sessions active; reconnect and closeSession are not implemented yet.
 pub async fn[T] with_client(
   options : ClientOptions,
   body : async (Client) -> T,
@@ -176,8 +202,30 @@ pub async fn[T] with_client(
     next_xid: 1,
     request_timeout_ms: options.request_timeout_ms,
     max_frame_size: options.max_frame_size,
+    event_buffer_capacity: options.event_buffer_capacity,
+    buffered_events: 0,
+    watches: [],
+    response_slot: None,
+    response_xid: 0,
+    pending_registration: None,
+    state_events: @aqueue.Queue::Queue(
+      kind=@aqueue.Kind::Blocking(options.event_buffer_capacity),
+    ),
+    last_receive_ms: @async.now(),
+    reader_task: None,
+    heartbeat_task: None,
     current_state: Connected,
   }
   defer client.close()
-  body(client)
+  let mut result : T? = None
+  @async.with_task_group(group => {
+    client.reader_task = Some(
+      group.spawn(() => client.read_loop(), no_wait=true),
+    )
+    client.heartbeat_task = Some(
+      group.spawn(() => client.heartbeat_loop(), no_wait=true),
+    )
+    result = Some(body(client))
+  })
+  result.unwrap()
 }

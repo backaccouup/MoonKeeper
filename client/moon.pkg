@@ -3,6 +3,7 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/socket",
   "moonbitlang/async/io",
+  "moonbitlang/async/aqueue",
   "moonbitlang/core/debug",
 }
 

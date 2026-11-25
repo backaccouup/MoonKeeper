@@ -4,19 +4,31 @@ Current native client calls are serialized on a single TCP connection. Each oper
 
 当前 native 客户端在一条 TCP 连接上串行执行调用，每次操作使用递增正数请求 ID。`exists(path)` 仅在服务端返回 `NoNode`（`-101`）时返回 `None`。其他服务端错误保留错误码。路径在发送前验证，非法路径不会断开已建立的连接。
 
-`request_timeout_ms` bounds each call, including waiting for the local request lock. A timeout closes TCP and moves the client to `Disconnected`, avoiding confusion between a late response and a later request. This status does not establish that the server has expired the session. Neither heartbeat nor reconnection is available yet; a new client scope is required for further operations.
+`request_timeout_ms` bounds each call, including waiting for the local request lock. A timeout closes TCP and moves the client to `Disconnected`, avoiding confusion between a late response and a later request. This status does not establish that the server has expired the session. Idle connections send heartbeats. Reconnection is not available yet; a new client scope is required for further operations.
 
-`request_timeout_ms` 包括等待本地请求锁的时间。请求超时后关闭 TCP 并将状态置为 `Disconnected`，避免迟到响应误配后续请求；这不等于确认服务端会话过期。尚无心跳和重连，后续操作须新建客户端作用域。
+`request_timeout_ms` 包括等待本地请求锁的时间。请求超时后关闭 TCP 并将状态置为 `Disconnected`，避免迟到响应误配后续请求；这不等于确认服务端会话过期。空闲连接会发送心跳；尚无自动重连，后续操作须新建客户端作用域。
 
-`close()` is idempotent and closes the socket. Leaving `with_client` also closes it. The current release does not send the ZooKeeper `closeSession` request, so server-side session cleanup follows the negotiated timeout. Concurrent request dispatch, heartbeats, queued request limits, and session-state notifications remain later work.
+`close()` is idempotent and closes the socket. Leaving `with_client` also closes it. The current release does not send the ZooKeeper `closeSession` request, so server-side session cleanup follows the negotiated timeout. Concurrent request dispatch and queued request limits remain later work.
 
-`close()` 可重复调用，`with_client` 退出也会关闭连接。当前尚未发送 ZooKeeper `closeSession` 请求，服务端会话依协商超时清理。并发分发、心跳、排队上限和会话状态通知仍待实现。
+`close()` 可重复调用，`with_client` 退出也会关闭连接。当前尚未发送 ZooKeeper `closeSession` 请求，服务端会话依协商超时清理。并发请求和排队上限仍待实现。
+
+## One-shot watches / 一次性监听
+
+`watch_exists`, `watch_data`, and `watch_children` install an ordinary ZooKeeper one-shot watch as a side effect of a read. The returned `Watch` yields at most one node event through `next_event()`; later calls return `None`. `watch_exists` also registers when the node is absent and returns `None` for that read. Multiple local subscriptions on the same path can each receive the single server notification. `watch.cancel()` only stops local consumption; it does not call server `removeWatches`.
+
+三个 `watch_*` 方法在读取时注册 ZooKeeper 一次性监听。返回的 `Watch` 通过 `next_event()` 至多取得一次节点通知，之后返回 `None`。`watch_exists` 在节点不存在时仍可注册，并把本次读取表示为 `None`。同一路径多个本地订阅可分别收到同一服务端通知。`watch.cancel()` 只取消本地消费，不调用服务端 `removeWatches`。
+
+After an event, read the node or child list again and register a new watch. The notification means something changed, not that every intermediate change was captured. Data watches respond to data changes or deletion; child watches respond to direct child changes or deletion; existence watches can also observe creation. Notifications are routed independently of ordinary replies and heartbeat replies. The receiver never waits for user event handling. If the total pending-event budget is full, the affected subscription ends with `WatchOverflow`; callers must reread and register again. `next_state_event()` exposes session state separately; a disconnect is never reported as a node change.
+
+收到事件后应重新读取节点或子节点列表，并重新注册监听。通知只说明发生了变化，不保证捕获其间每次修改。数据监听响应数据变化或删除；子节点监听响应直接子节点变化或删除；存在性监听还可响应创建。通知、普通响应和心跳响应分开分发，网络接收不会等待应用消费事件。待消费事件总数超过上限时，受影响订阅以 `WatchOverflow` 结束，调用方须重新读取和注册。`next_state_event()` 独立报告会话状态，不把断线报告为节点变化。
+
+Semantics follow the [ZooKeeper Programmer's Guide on watches](https://zookeeper.apache.org/doc/r3.9.3/zookeeperProgrammers.html#ch_zkWatches). This client does not restore watches after disconnection, because session reconnection is not implemented.
 
 ## Persistent znode writes / 持久节点写入
 
-`create`, `get_data`, `set_data`, and `delete` share the serial request channel. Create requires an explicit ACL and currently supports only `Persistent`. The named `open_acl_unsafe()` helper grants all permissions to `world:anyone`. Null data and zero-length data are distinct. The full encoded request, including path, data, ACL, and headers, must fit the configured frame limit and the library's 1 MiB ceiling.
+`create`, `get_data`, `set_data`, and `delete` share the serial request channel. Create requires an explicit ACL and supports the four basic persistent, ephemeral, and sequential modes. The named `open_acl_unsafe()` helper grants all permissions to `world:anyone`. Null data and zero-length data are distinct. The full encoded request, including path, data, ACL, and headers, must fit the configured frame limit and the library's 1 MiB ceiling.
 
-四种 CRUD 操作共用串行请求通道。创建时必须显式选择 ACL，当前仅支持持久节点。`open_acl_unsafe()` 给予 `world:anyone` 全部权限。null 数据和零字节数据不同。请求的路径、数据、ACL 和头部都计入帧上限，库另有 1 MiB 总上限。
+四种 CRUD 操作共用串行请求通道。创建时必须显式选择 ACL，支持持久、临时及其顺序模式。`open_acl_unsafe()` 给予 `world:anyone` 全部权限。null 数据和零字节数据不同。请求的路径、数据、ACL 和头部都计入帧上限，库另有 1 MiB 总上限。
 
 Version `-1` bypasses the version check for set/delete; nonnegative versions require a match, and less than `-1` fails locally. Server failures such as `NoNode`, `NodeExists`, `BadVersion`, and `NotEmpty` remain `ClientError::Server(code)`. A failed write before any bytes can be sent is an ordinary local error. Once writing begins, a lost connection, timeout, or invalid response becomes `OutcomeUnknown`: the operation may have committed. The client closes that connection; callers should inspect server state with a new connection before retrying.
 

@@ -23,6 +23,7 @@ pub suberror ClientError {
   InvalidResponse
   /// A write may have reached the server; inspect state before retrying.
   OutcomeUnknown
+  WatchOverflow
 }
 
 ///|

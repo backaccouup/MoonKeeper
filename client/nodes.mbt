@@ -9,6 +9,7 @@ async fn[T] Client::request(
   encode : (Int32) -> Bytes raise @moonkeeper.ProtocolError,
   decode : (Bytes) -> T raise @moonkeeper.ProtocolError,
   is_write : Bool,
+  watch~ : Watch? = None,
 ) -> T {
   let mut acquired = false
   let mut possibly_sent = false
@@ -32,42 +33,60 @@ async fn[T] Client::request(
       let wire = encode(xid)
       @moonkeeper.validate_request_frame_size(wire, self.max_frame_size)
       self.next_xid = if xid == 2147483647 { 0 } else { xid + 1 }
+      let response : @aqueue.Queue[Bytes] = @aqueue.Queue::Queue(
+        kind=@aqueue.Kind::Blocking(1),
+      )
+      self.response_slot = Some(response)
+      self.response_xid = xid
+      self.pending_registration = watch
+      if watch is Some(subscription) {
+        self.watches.push(subscription)
+      }
       // A partial write can reach ZooKeeper even if Writer::write fails.
       possibly_sent = true
       @io.Writer::write(self.socket, wire)
-      let header = @io.Reader::read_exactly(self.socket, 4)
-      let length = match header {
-        [i32be(n)] if n >= 16 && n <= self.max_frame_size => n
-        _ => raise InvalidResponse
-      }
-      let payload = @io.Reader::read_exactly(self.socket, length)
-      let reply = @moonkeeper.decode_reply_header(payload)
-      guard reply.xid == xid else { raise UnexpectedXid(reply.xid) }
+      let payload = response.get()
       decode(payload)
     },
   ) catch {
-    ClientError::Closed => raise ClientError::Closed
-    ClientError::Disconnected => raise ClientError::Disconnected
+    ClientError::Closed =>
+      if is_write && possibly_sent {
+        raise OutcomeUnknown
+      } else {
+        raise ClientError::Closed
+      }
+    ClientError::Disconnected =>
+      if is_write && possibly_sent {
+        raise OutcomeUnknown
+      } else {
+        raise ClientError::Disconnected
+      }
     ClientError::QueueFull => raise ClientError::QueueFull
+    ClientError::UnexpectedXid(_) as error =>
+      if is_write && possibly_sent {
+        raise OutcomeUnknown
+      } else {
+        raise error
+      }
+    ClientError::InvalidResponse =>
+      if is_write && possibly_sent {
+        raise OutcomeUnknown
+      } else {
+        raise ClientError::InvalidResponse
+      }
     @moonkeeper.ProtocolError::ServerError(code) => raise Server(code)
     @moonkeeper.ProtocolError::_ as error => {
       if !possibly_sent {
         raise Protocol(error)
       }
-      if self.current_state != Closed {
-        self.current_state = Disconnected
-      }
-      self.socket.close()
+      self.mark_disconnected(Protocol(error))
       if is_write {
         raise OutcomeUnknown
       }
       raise Protocol(error)
     }
     error => {
-      if self.current_state != Closed {
-        self.current_state = Disconnected
-      }
-      self.socket.close()
+      self.mark_disconnected(Transport(error.to_string()))
       if is_write && possibly_sent {
         raise OutcomeUnknown
       }
