@@ -205,7 +205,11 @@ pub async fn[T] with_client(
       current_state: Connected,
     }
     client.start_io()
-    defer @async.protect_from_cancel(() => client.close())
+    defer (if @async.is_being_cancelled() {
+      client.release_closed_client()
+    } else {
+      @async.protect_from_cancel(() => client.close())
+    })
     result = Some(body(client))
   })
   result.unwrap()

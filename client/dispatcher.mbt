@@ -68,6 +68,25 @@ fn Client::mark_disconnected(self : Client, reason : ClientError) -> Unit {
 }
 
 ///|
+/// Synchronous cleanup is also safe while the entire task group is unwinding.
+fn Client::release_closed_client(self : Client) -> Unit {
+  if self.current_state != Closed {
+    self.emit_state(Closed)
+  }
+  self.stop_io(ClientError::Closed)
+  if self.recovery is Some(t) {
+    t.cancel()
+  }
+  self.close_watches()
+  self.auth_frames.clear()
+  self.password = b""
+  if !self.state_stream_closed {
+    self.state_stream_closed = true
+    self.state_events.close()
+  }
+}
+
+///|
 /// Send closeSession on the live transport before releasing it. Cleanup also
 /// runs if cancellation or a network failure interrupts the best-effort write.
 pub async fn Client::close(self : Client) -> Unit {
@@ -76,19 +95,7 @@ pub async fn Client::close(self : Client) -> Unit {
   }
   let live = self.current_state == Connected
   self.emit_state(Closed)
-  defer {
-    self.stop_io(ClientError::Closed)
-    if self.recovery is Some(t) {
-      t.cancel()
-    }
-    self.close_watches()
-    self.auth_frames.clear()
-    self.password = b""
-    if !self.state_stream_closed {
-      self.state_stream_closed = true
-      self.state_events.close()
-    }
-  }
+  defer self.release_closed_client()
   if live {
     let xid = self.allocate_xid()
     ignore(

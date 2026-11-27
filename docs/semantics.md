@@ -16,7 +16,7 @@ A server error keeps its numeric code. Only `exists` and `watch_exists` map `NoN
 
 会话期限以服务端协商超时和最后一次收到服务端帧的时间计算。恢复遭服务端拒绝，或本地安全恢复期限用尽时，状态变为 `Expired`。服务端认证失败进入 `AuthFailed`。此后需要创建新客户端。一次短暂断连期间，原会话的临时节点可以继续存在。默认的单地址配置未启用恢复，可用 `state()` 查询状态，通过 `next_state_event()` 等待变化。
 
-`close()` is idempotent. On a live connection it attempts to send `closeSession`, then releases the transport and pending callers. The scope also cleans up on errors and cancellation. If the close packet fails to reach ZooKeeper, the server uses its session timeout to remove ephemeral nodes. Observe their disappearance from a second client when cleanup matters.
+`close()` is idempotent. On a live connection it attempts to send `closeSession`, then releases the transport and pending callers. The scope also closes on callback errors. External cancellation immediately releases the transport and pending calls. ZooKeeper may retain the session until its negotiated timeout. If the close packet fails to reach ZooKeeper, the server uses its session timeout to remove ephemeral nodes. Observe their disappearance from a second client when cleanup matters.
 
 ## Watches
 
