@@ -40,8 +40,8 @@ async def line(stream):
     return (await asyncio.wait_for(stream.readline(), DEADLINE)).decode().rstrip("\r\n")
 
 
-async def check_config_recovery(program, node, env, server_host, server_port):
-    """Drop the example's connection once while the remote znode stays unchanged."""
+async def check_config_recovery(program, node, env, server_host, server_port, cli):
+    """Send repeated healthy notifications, then drop TCP without changing the znode."""
     connections = set()
 
     async def copy(reader, writer):
@@ -67,13 +67,20 @@ async def check_config_recovery(program, node, env, server_host, server_port):
     async with await asyncio.start_server(forward, "127.0.0.1", 0) as relay:
         proxy_port = str(relay.sockets[0].getsockname()[1])
         scoped_env = {**env, "MOONKEEPER_ZK_HOST": "127.0.0.1", "MOONKEEPER_ZK_PORT": proxy_port}
-        async with start(program, node, "2", env=scoped_env) as watcher:
-            assert await line(watcher.stdout) == "version=2 data=b25l"
+        updates = 12
+        version = 2
+        async with start(program, node, str(updates + 2), env=scoped_env) as watcher:
+            assert await line(watcher.stdout) == f"version={version} data=b25l"
+            for _ in range(updates):
+                await cli("set", node, "--text", "one", "--version", str(version))
+                version += 1
+                assert await line(watcher.stdout) == f"version={version} data=b25l"
             assert len(connections) == 1
             next(iter(connections)).close()
             assert "stale" in await line(watcher.stderr)
-            assert await line(watcher.stdout) == "version=2 data=b25l"
+            assert await line(watcher.stdout) == f"version={version} data=b25l"
             assert await asyncio.wait_for(watcher.wait(), DEADLINE) == 0
+        return version
 
 
 async def main():
@@ -134,14 +141,14 @@ async def main():
             assert await line(watcher.stdout) == f"NodeDataChanged {node}"
             assert await asyncio.wait_for(watcher.wait(), DEADLINE) == 0
 
-        await check_config_recovery(config_watch, node, env, host, int(port))
+        version = await check_config_recovery(config_watch, node, env, host, int(port), cli)
         print("Configuration watch marked its snapshot stale and reread it after reconnect.")
 
         async with start(config_watch, node, "3", env=env) as watcher:
-            assert await line(watcher.stdout) == "version=2 data=b25l"
-            await cli("set", node, "--version", "2", "--text", "two")
-            assert await line(watcher.stdout) == "version=3 data=dHdv"
-            await cli("delete", node, "--version", "3")
+            assert await line(watcher.stdout) == f"version={version} data=b25l"
+            await cli("set", node, "--version", str(version), "--text", "two")
+            assert await line(watcher.stdout) == f"version={version + 1} data=dHdv"
+            await cli("delete", node, "--version", str(version + 1))
             assert await line(watcher.stdout) == "missing"
             assert await asyncio.wait_for(watcher.wait(), DEADLINE) == 0
             print("Configuration watch saw both updates and deletion across processes.")

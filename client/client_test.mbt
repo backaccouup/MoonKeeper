@@ -40,6 +40,7 @@ async test "real TCP sends full request and accepts a bytewise handshake then cl
         conn.write(Bytes::make(1, byte))
         @async.sleep(1)
       }
+      assert_eq(conn.read_exactly(12), @moonkeeper.encode_close_session(1))
       assert_eq(conn.read_some(), None)
     },
     endpoint => {
@@ -108,6 +109,7 @@ async test "callback errors propagate unchanged and close the connection" {
     conn => {
       ignore(conn.read_exactly(49))
       conn.write(fixture())
+      assert_eq(conn.read_exactly(12), @moonkeeper.encode_close_session(1))
       assert_eq(conn.read_some(), None)
     },
     endpoint => {

@@ -168,7 +168,9 @@ fn Client::dispatch_payload(self : Client, payload : Bytes) -> Unit raise {
     }
     _ => raise UnexpectedXid(reply.xid)
   }
-  if reply.zxid > self.last_zxid {
+  // A multi can emit several notifications with one zxid. Only an ordinary
+  // acknowledgement establishes that all preceding events were consumed.
+  if reply.xid > 0 && reply.zxid > self.last_zxid {
     self.last_zxid = reply.zxid
   }
 }
@@ -190,10 +192,15 @@ async fn Client::read_loop(
   generation : Int32,
 ) -> Unit {
   defer socket.close()
-  while self.current_state == Connected && self.generation == generation {
+  // close() marks the client Closed before writing closeSession. The reader
+  // retains ownership of the socket until stop_io invalidates its generation.
+  while self.generation == generation {
     try {
       let payload = read_reply(socket, self.max_frame_size)
       guard self.generation == generation else { return }
+      if self.current_state == Closed {
+        continue
+      }
       self.last_receive_ms = @async.now()
       self.dispatch_payload(payload)
     } catch {
