@@ -5,11 +5,8 @@
 async fn establish_session(
   socket : @socket.Tcp,
   options : ClientOptions,
-) -> SessionInfo {
-  let request = @moonkeeper.encode_connect_request(
-    options.session_timeout_ms,
-    read_only=options.read_only,
-  )
+  request : Bytes,
+) -> (SessionInfo, Bytes) {
   // Writer::write handles short writes until the full request has been sent.
   @io.Writer::write(socket, request)
   let decoder = @moonkeeper.FrameDecoder::new(
@@ -45,11 +42,14 @@ async fn establish_session(
           guard !response.read_only || options.read_only else {
             raise ReadOnlyNotAllowed
           }
-          return {
-            session_id: response.session_id,
-            session_timeout_ms: response.session_timeout_ms,
-            read_only: response.read_only,
-          }
+          return (
+            {
+              session_id: response.session_id,
+              session_timeout_ms: response.session_timeout_ms,
+              read_only: response.read_only,
+            },
+            password,
+          )
         }
         remaining -= chunk.length()
         if remaining == 0 {

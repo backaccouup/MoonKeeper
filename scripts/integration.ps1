@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('single', 'existing')][string]$Mode = 'single',
+    [ValidateSet('single', 'existing', 'cluster')][string]$Mode = 'single',
     [string]$HostName = '127.0.0.1',
     [ValidateRange(1, 65535)][int]$Port = 21819
 )
@@ -13,6 +13,11 @@ $started = $false
 Push-Location -LiteralPath $repoPath
 try {
     if (-not (Get-Command moon -ErrorAction SilentlyContinue)) { throw 'MoonBit is required; install the documented toolchain first.' }
+    if ($Mode -eq 'cluster') {
+        python integration/cluster.py
+        if ($LASTEXITCODE -ne 0) { throw 'Cluster recovery integration failed.' }
+        return
+    }
     $env:MOONKEEPER_ZK_HOST = $HostName
     $env:MOONKEEPER_ZK_PORT = "$Port"
     if ($Mode -eq 'single') {
@@ -36,6 +41,8 @@ try {
     if (-not $ready) { throw "ZooKeeper handshake readiness failed at ${HostName}:$Port." }
     moon test integration --target native --include-skipped --deny-warn
     if ($LASTEXITCODE -ne 0) { throw 'Real ZooKeeper integration tests failed.' }
+    python integration/interop.py
+    if ($LASTEXITCODE -ne 0) { throw 'Independent client interoperability failed.' }
 } finally {
     if ($started) {
         docker compose -p $projectName -f $composePath down --volumes --remove-orphans

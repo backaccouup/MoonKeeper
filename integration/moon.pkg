@@ -2,7 +2,10 @@ import {
   "Mr-Shi123/moonkeeper/client",
   "Mr-Shi123/moonkeeper",
   "moonbitlang/async",
+  "moonbitlang/async/process",
   "moonbitlang/core/env",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/random",
   "moonbitlang/core/string",
 } for "test"
 

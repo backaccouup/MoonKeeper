@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Mr-Shi123/moonkeeper/examples/common"
+
+import {
+  "Mr-Shi123/moonkeeper/client",
+}
+
+// Values
+pub fn options() -> @client.ClientOptions raise
+
+pub async fn wait_connected(@client.Client) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

@@ -3,7 +3,10 @@
 /.mooncakes/
 /.moonagent/
 /cmd/**/pkg.generated.mbti
-/integration/pkg.generated.mbti
+/integration/**/pkg.generated.mbti
+/examples/config_watch/pkg.generated.mbti
+/examples/service_registration/pkg.generated.mbti
+__pycache__/
 /.idea/
 /.vscode/
 .DS_Store

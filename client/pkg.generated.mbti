@@ -37,15 +37,19 @@ pub fn ClientError::to_repr(Self) -> @debug.Repr
 pub struct Client {
   // private fields
 }
-pub fn Client::close(Self) -> Unit
+pub async fn Client::add_auth(Self, String, Bytes) -> Unit
+pub async fn Client::close(Self) -> Unit
 pub async fn Client::create(Self, String, Bytes?, @moonkeeper.CreateOptions) -> String
 pub async fn Client::delete(Self, String, Int32) -> Unit
 pub async fn Client::exists(Self, String) -> @moonkeeper.Stat?
+pub async fn Client::get_acl(Self, String) -> @moonkeeper.AclResult
 pub async fn Client::get_children(Self, String) -> Array[String]
 pub async fn Client::get_children_with_stat(Self, String) -> @moonkeeper.ChildrenResult
 pub async fn Client::get_data(Self, String) -> @moonkeeper.DataResult
+pub async fn Client::multi(Self, Array[@moonkeeper.MultiOp]) -> @moonkeeper.MultiOutcome
 pub async fn Client::next_state_event(Self) -> ClientState?
 pub fn Client::session_info(Self) -> SessionInfo
+pub async fn Client::set_acl(Self, String, Array[@moonkeeper.Acl], Int32) -> @moonkeeper.Stat
 pub async fn Client::set_data(Self, String, Bytes?, Int32) -> @moonkeeper.Stat
 pub fn Client::state(Self) -> ClientState
 pub async fn Client::watch_children(Self, String) -> (@moonkeeper.ChildrenResult, Watch)
@@ -54,6 +58,8 @@ pub async fn Client::watch_exists(Self, String) -> (@moonkeeper.Stat?, Watch)
 
 pub(all) struct ClientOptions {
   endpoint : Endpoint
+  fallback_endpoints : Array[Endpoint]
+  reconnect : ReconnectPolicy?
   session_timeout_ms : Int32
   request_timeout_ms : Int32
   max_frame_size : Int32
@@ -61,7 +67,7 @@ pub(all) struct ClientOptions {
   event_buffer_capacity : Int32
   read_only : Bool
 }
-pub fn ClientOptions::new(Endpoint, session_timeout_ms? : Int32, request_timeout_ms? : Int32, max_frame_size? : Int32, max_pending_requests? : Int32, event_buffer_capacity? : Int32, read_only? : Bool) -> Self
+pub fn ClientOptions::new(Endpoint, fallback_endpoints? : Array[Endpoint], reconnect? : ReconnectPolicy?, session_timeout_ms? : Int32, request_timeout_ms? : Int32, max_frame_size? : Int32, max_pending_requests? : Int32, event_buffer_capacity? : Int32, read_only? : Bool) -> Self
 
 #derive(Eq, @debug.Debug)
 pub(all) enum ClientState {
@@ -85,6 +91,13 @@ pub fn Endpoint::equal(Self, Self) -> Bool
 pub fn Endpoint::new(String, port? : Int32) -> Self
 pub fn Endpoint::not_equal(Self, Self) -> Bool
 pub fn Endpoint::to_repr(Self) -> @debug.Repr
+
+pub(all) struct ReconnectPolicy {
+  attempts : Int32
+  initial_delay_ms : Int32
+  max_delay_ms : Int32
+}
+pub fn ReconnectPolicy::new(attempts? : Int32, initial_delay_ms? : Int32, max_delay_ms? : Int32) -> Self
 
 #derive(Eq, @debug.Debug)
 pub struct SessionInfo {

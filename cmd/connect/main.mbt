@@ -19,7 +19,5 @@ async fn main {
     println("session_timeout_ms=\{info.session_timeout_ms}")
     println("read_only=\{info.read_only}")
   })
-  println(
-    "TCP connection closed; heartbeats and closeSession are not implemented yet.",
-  )
+  println("Client scope closed.")
 }

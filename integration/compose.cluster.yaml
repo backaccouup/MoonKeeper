@@ -1,0 +1,35 @@
+x-peer: &peer
+  image: zookeeper:3.9.3
+  tmpfs:
+    - /data
+    - /datalog
+  environment: &settings
+    ZOO_SERVERS: "server.1=zk1:2888:3888;2181 server.2=zk2:2888:3888;2181 server.3=zk3:2888:3888;2181"
+    ZOO_TICK_TIME: "1000"
+    ZOO_4LW_COMMANDS_WHITELIST: srvr
+    ZOO_ADMINSERVER_ENABLED: "false"
+    ZOO_STANDALONE_ENABLED: "false"
+    JVMFLAGS: "-XX:ActiveProcessorCount=2 -Xms32m -Xmx128m"
+
+services:
+  zk1:
+    <<: *peer
+    environment:
+      <<: *settings
+      ZOO_MY_ID: "1"
+    ports:
+      - "127.0.0.1:${MOONKEEPER_PEER1_PORT:?required}:2181"
+  zk2:
+    <<: *peer
+    environment:
+      <<: *settings
+      ZOO_MY_ID: "2"
+    ports:
+      - "127.0.0.1:${MOONKEEPER_PEER2_PORT:?required}:2181"
+  zk3:
+    <<: *peer
+    environment:
+      <<: *settings
+      ZOO_MY_ID: "3"
+    ports:
+      - "127.0.0.1:${MOONKEEPER_PEER3_PORT:?required}:2181"

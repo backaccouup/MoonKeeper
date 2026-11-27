@@ -2,43 +2,105 @@
 // SPDX-License-Identifier: Apache-2.0
 
 ///|
+fn Client::stop_io(self : Client, reason : ClientError) -> Unit {
+  self.generation += 1
+  if self.reader_task is Some(t) {
+    t.cancel()
+  }
+  if self.heartbeat_task is Some(t) {
+    t.cancel()
+  }
+  for _, slot in self.pending {
+    (slot.reject)(reason)
+    if slot.watch is Some(w) {
+      w.cancel()
+    }
+  }
+  self.pending.clear()
+}
+
+///|
+fn Client::emit_state(self : Client, state : ClientState) -> Unit {
+  self.current_state = state
+  if self.state_stream_closed {
+    return
+  }
+  if !(self.state_events.try_put(state) catch { _ => false }) {
+    self.state_stream_closed = true
+    self.state_events.close(error=WatchOverflow, clear=true)
+  }
+}
+
+///|
 fn Client::end_session(
   self : Client,
   state : ClientState,
   reason : ClientError,
 ) -> Unit {
-  if self.current_state == Closed ||
-    self.current_state == Disconnected ||
-    self.current_state == Expired ||
-    self.current_state == AuthFailed {
+  if self.current_state is Closed ||
+    self.current_state is Expired ||
+    self.current_state is AuthFailed {
     return
   }
-  self.current_state = state
-  if self.reader_task is Some(task) {
-    task.cancel()
-  }
-  if self.heartbeat_task is Some(task) {
-    task.cancel()
-  }
-  if self.reader_task is None {
-    self.socket.close()
-  }
-  if self.response_slot is Some(slot) {
-    slot.close(error=reason)
-  }
-  self.response_slot = None
-  self.pending_registration = None
+  self.emit_state(state)
+  self.stop_io(reason)
   self.close_watches()
-  if !(self.state_events.try_put(state) catch { _ => false }) {
-    self.state_events.close(error=WatchOverflow, clear=true)
-  } else {
+  self.auth_frames.clear()
+  self.password = b""
+  if !self.state_stream_closed {
+    self.state_stream_closed = true
     self.state_events.close()
   }
 }
 
 ///|
 fn Client::mark_disconnected(self : Client, reason : ClientError) -> Unit {
-  self.end_session(Disconnected, reason)
+  guard self.current_state == Connected else { return }
+  guard self.options.reconnect is Some(policy) else {
+    self.end_session(Disconnected, reason)
+    return
+  }
+  self.emit_state(Disconnected)
+  self.stop_io(reason)
+  self.recovery = Some(
+    self.group.spawn(() => self.restore(policy), no_wait=true),
+  )
+}
+
+///|
+/// Send closeSession on the live transport before releasing it. Cleanup also
+/// runs if cancellation or a network failure interrupts the best-effort write.
+pub async fn Client::close(self : Client) -> Unit {
+  if self.current_state == Closed {
+    return
+  }
+  let live = self.current_state == Connected
+  self.emit_state(Closed)
+  defer {
+    self.stop_io(ClientError::Closed)
+    if self.recovery is Some(t) {
+      t.cancel()
+    }
+    self.close_watches()
+    self.auth_frames.clear()
+    self.password = b""
+    if !self.state_stream_closed {
+      self.state_stream_closed = true
+      self.state_events.close()
+    }
+  }
+  if live {
+    let xid = self.allocate_xid()
+    ignore(
+      @async.with_timeout_opt(self.request_timeout_ms, () => {
+        self.lock.acquire()
+        defer self.lock.release()
+        @io.Writer::write(self.socket, @moonkeeper.encode_close_session(xid))
+      }) catch {
+        _ => None
+      },
+    )
+  }
 }
 
 ///|
@@ -57,7 +119,7 @@ fn Client::dispatch_node_event(
 ///|
 fn Client::dispatch_state_event(self : Client, state : Int32) -> Unit {
   match state {
-    0 => self.end_session(Disconnected, Disconnected)
+    0 => self.mark_disconnected(Disconnected)
     -112 => self.end_session(Expired, Disconnected)
     4 => self.end_session(AuthFailed, Disconnected)
     3 => () // Initial SyncConnected is already represented by with_client.
@@ -80,72 +142,86 @@ fn Client::dispatch_payload(self : Client, payload : Bytes) -> Unit raise {
         raise InvalidResponse
       }
     }
-    xid if xid > 0 => {
-      guard xid == self.response_xid && self.response_slot is Some(slot) else {
+    xid if xid > 0 || xid == -4 => {
+      guard self.pending.get(xid) is Some(slot) else {
         raise UnexpectedXid(xid)
       }
-      if self.pending_registration is Some(watch) {
-        self.pending_registration = None
+      (slot.accept)(payload)
+      self.pending.remove(xid)
+      if slot.watch is Some(watch) {
         if reply.err == 0 || (watch.kind is Exists && reply.err == -101) {
-          // Registration becomes visible before the next network frame.
+          watch.missing = reply.err == -101
           watch.activate()
         } else {
           watch.cancel()
         }
       }
-      self.response_slot = None
-      guard slot.try_put(payload) else { raise InvalidResponse }
+      if reply.err == 0 && slot.on_ack is Some(ack) {
+        ack()
+      }
+      if reply.err == -115 {
+        self.end_session(AuthFailed, Disconnected)
+      }
+      if reply.err == -112 {
+        self.end_session(Expired, Disconnected)
+      }
     }
     _ => raise UnexpectedXid(reply.xid)
+  }
+  if reply.zxid > self.last_zxid {
+    self.last_zxid = reply.zxid
   }
 }
 
 ///|
-async fn Client::read_loop(self : Client) -> Unit {
-  defer self.socket.close()
-  for ;; {
-    if self.current_state != Connected {
-      return
-    }
-    let header = @io.Reader::read_exactly(self.socket, 4) catch {
+async fn read_reply(socket : @socket.Tcp, limit : Int32) -> Bytes {
+  guard @io.Reader::read_exactly(socket, 4) is [i32be(length)] &&
+    length >= 16 &&
+    length <= limit else {
+    raise InvalidResponse
+  }
+  @io.Reader::read_exactly(socket, length)
+}
+
+///|
+async fn Client::read_loop(
+  self : Client,
+  socket : @socket.Tcp,
+  generation : Int32,
+) -> Unit {
+  defer socket.close()
+  while self.current_state == Connected && self.generation == generation {
+    try {
+      let payload = read_reply(socket, self.max_frame_size)
+      guard self.generation == generation else { return }
+      self.last_receive_ms = @async.now()
+      self.dispatch_payload(payload)
+    } catch {
       error => {
-        if !@async.is_cancellation_error(error) {
-          self.mark_disconnected(Transport(error.to_string()))
+        if self.generation == generation && !@async.is_cancellation_error(error) {
+          let reason = match error {
+            ClientError::_ as e => e
+            @moonkeeper.ProtocolError::_ as e => Protocol(e)
+            _ => Transport(error.to_string())
+          }
+          self.mark_disconnected(reason)
         }
-        return
-      }
-    }
-    let length = match header {
-      [i32be(n)] if n >= 16 && n <= self.max_frame_size => n
-      _ => {
-        self.mark_disconnected(InvalidResponse)
-        return
-      }
-    }
-    let payload = @io.Reader::read_exactly(self.socket, length) catch {
-      error => {
-        if !@async.is_cancellation_error(error) {
-          self.mark_disconnected(Transport(error.to_string()))
-        }
-        return
-      }
-    }
-    self.last_receive_ms = @async.now()
-    self.dispatch_payload(payload) catch {
-      ClientError::_ as error => {
-        self.mark_disconnected(error)
-        return
-      }
-      @moonkeeper.ProtocolError::_ as error => {
-        self.mark_disconnected(Protocol(error))
-        return
-      }
-      error => {
-        self.mark_disconnected(Transport(error.to_string()))
         return
       }
     }
   }
+}
+
+///|
+fn Client::start_io(self : Client) -> Unit {
+  let socket = self.socket
+  let generation = self.generation
+  self.reader_task = Some(
+    self.group.spawn(() => self.read_loop(socket, generation), no_wait=true),
+  )
+  self.heartbeat_task = Some(
+    self.group.spawn(() => self.heartbeat_loop(generation), no_wait=true),
+  )
 }
 
 ///|
@@ -161,21 +237,27 @@ async fn Client::send_ping(self : Client) -> Unit {
 }
 
 ///|
-async fn Client::heartbeat_loop(self : Client) -> Unit {
-  let interval = Int32::max(500, self.info.session_timeout_ms / 3)
+async fn Client::heartbeat_loop(self : Client, generation : Int32) -> Unit {
+  let interval = Int32::max(1, self.info.session_timeout_ms / 3)
   for ;; {
     @async.sleep(interval)
-    if self.current_state != Connected {
+    if self.generation != generation || self.current_state != Connected {
       return
     }
     if @async.now() - self.last_receive_ms >=
-      self.info.session_timeout_ms.to_int64() {
+      self.info.session_timeout_ms.to_int64() * 2L / 3L {
       self.mark_disconnected(Transport("session lost contact with server"))
       return
     }
-    self.send_ping() catch {
+    let budget = Int64::max(
+      1L,
+      self.last_receive_ms +
+      self.info.session_timeout_ms.to_int64() * 2L / 3L -
+      @async.now(),
+    ).to_int()
+    @async.with_timeout(budget, () => self.send_ping()) catch {
       error => {
-        if !@async.is_cancellation_error(error) {
+        if self.generation == generation && !@async.is_cancellation_error(error) {
           self.mark_disconnected(Transport(error.to_string()))
         }
         return

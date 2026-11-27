@@ -1,6 +1,6 @@
 name = "Mr-Shi123/moonkeeper"
 
-version = "0.1.0"
+version = "1.0.0"
 
 readme = "README.md"
 
@@ -8,7 +8,7 @@ license = "Apache-2.0"
 
 keywords = [ "zookeeper", "client", "protocol" ]
 
-description = "ZooKeeper client for MoonBit: native TCP and znode operations"
+description = "ZooKeeper client for MoonBit: sessions, watches, ACLs, transactions and a native CLI"
 
 preferred_target = "native"
 

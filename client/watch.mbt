@@ -17,6 +17,7 @@ pub struct Watch {
   priv kind : WatchKind
   priv events : @aqueue.Queue[@moonkeeper.WatchEvent]
   priv mut active : Bool
+  priv mut missing : Bool
   priv mut registered : Bool
   priv mut pending : Bool
   priv mut finished : Bool
@@ -31,6 +32,7 @@ fn Client::new_watch(self : Client, path : String, kind : WatchKind) -> Watch {
     events: @aqueue.Queue::Queue(kind=@aqueue.Kind::Blocking(1)),
     active: true,
     registered: false,
+    missing: false,
     pending: false,
     finished: false,
   }

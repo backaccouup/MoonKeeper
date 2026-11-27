@@ -2,97 +2,123 @@
 // SPDX-License-Identifier: Apache-2.0
 
 ///|
-/// Execute one request at a time on this connection. The lock also protects xid
-/// allocation. A failed exchange closes TCP, so a late reply cannot be reused.
+priv struct Pending {
+  accept : (Bytes) -> Unit raise @moonkeeper.ProtocolError
+  reject : (ClientError) -> Unit
+  watch : Watch?
+  on_ack : (() -> Unit)?
+}
+
+///|
+fn Client::allocate_xid(self : Client) -> Int32 {
+  while self.pending.contains(self.next_xid) {
+    self.next_xid = if self.next_xid == 2147483647 {
+      1
+    } else {
+      self.next_xid + 1
+    }
+  }
+  let xid = self.next_xid
+  self.next_xid = if xid == 2147483647 { 1 } else { xid + 1 }
+  xid
+}
+
+///|
+/// The mutex protects only complete wire writes. Reply slots remain independent.
 async fn[T] Client::request(
   self : Client,
   encode : (Int32) -> Bytes raise @moonkeeper.ProtocolError,
   decode : (Bytes) -> T raise @moonkeeper.ProtocolError,
   is_write : Bool,
   watch~ : Watch? = None,
+  reserved_xid~ : Int32? = None,
+  on_ack~ : (() -> Unit)? = None,
 ) -> T {
-  let mut acquired = false
-  let mut possibly_sent = false
-  defer (if acquired { self.lock.release() })
-  let deadline = @async.now() + self.request_timeout_ms.to_int64()
-  let result = @async.with_timeout(
-    self.request_timeout_ms,
-    error=RequestTimeout,
-    () => {
-      self.lock.acquire()
-      acquired = true
-      guard self.current_state == Connected else {
-        if self.current_state == ClientState::Closed {
-          raise ClientError::Closed
-        } else {
-          raise ClientError::Disconnected
-        }
-      }
-      let xid = self.next_xid
-      guard xid > 0 else { raise QueueFull }
-      let wire = encode(xid)
-      @moonkeeper.validate_request_frame_size(wire, self.max_frame_size)
-      self.next_xid = if xid == 2147483647 { 0 } else { xid + 1 }
-      let response : @aqueue.Queue[Bytes] = @aqueue.Queue::Queue(
-        kind=@aqueue.Kind::Blocking(1),
+  guard self.current_state == Connected else {
+    if self.current_state == Closed {
+      raise ClientError::Closed
+    }
+    raise ClientError::Disconnected
+  }
+  guard self.pending.length() < self.options.max_pending_requests else {
+    raise QueueFull
+  }
+  if self.options.reconnect is Some(_) && watch is Some(w) {
+    let restore_size = 32 + @utf8.encode(w.path).length()
+    if restore_size > self.max_frame_size {
+      raise InvalidOptions(
+        "watch path exceeds configured session recovery frame limit",
       )
-      self.response_slot = Some(response)
-      self.response_xid = xid
-      self.pending_registration = watch
-      if watch is Some(subscription) {
-        self.watches.push(subscription)
-      }
-      // A partial write can reach ZooKeeper even if Writer::write fails.
-      possibly_sent = true
-      @io.Writer::write(self.socket, wire)
-      let payload = response.get()
-      decode(payload)
-    },
-  ) catch {
-    ClientError::Closed =>
-      if is_write && possibly_sent {
-        raise OutcomeUnknown
-      } else {
-        raise ClientError::Closed
-      }
-    ClientError::Disconnected =>
-      if is_write && possibly_sent {
-        raise OutcomeUnknown
-      } else {
-        raise ClientError::Disconnected
-      }
-    ClientError::QueueFull => raise ClientError::QueueFull
-    ClientError::UnexpectedXid(_) as error =>
-      if is_write && possibly_sent {
-        raise OutcomeUnknown
-      } else {
-        raise error
-      }
-    ClientError::InvalidResponse =>
-      if is_write && possibly_sent {
-        raise OutcomeUnknown
-      } else {
-        raise ClientError::InvalidResponse
-      }
-    @moonkeeper.ProtocolError::ServerError(code) => raise Server(code)
-    @moonkeeper.ProtocolError::_ as error => {
-      if !possibly_sent {
-        raise Protocol(error)
-      }
-      self.mark_disconnected(Protocol(error))
-      if is_write {
-        raise OutcomeUnknown
-      }
+    }
+  }
+  let generation = self.generation
+  let previous_xid = self.next_xid
+  let xid = match reserved_xid {
+    Some(id) => id
+    None => self.allocate_xid()
+  }
+  guard !self.pending.contains(xid) else { raise QueueFull }
+  let wire = try {
+    let bytes = encode(xid)
+    @moonkeeper.validate_request_frame_size(bytes, self.max_frame_size)
+    bytes
+  } catch {
+    error => {
+      self.next_xid = previous_xid
       raise Protocol(error)
     }
+  }
+  let response : @aqueue.Queue[T] = @aqueue.Queue::Queue(kind=Blocking(1))
+  self.pending[xid] = {
+    accept: payload => {
+      let value = decode(payload) catch {
+        @moonkeeper.ProtocolError::ServerError(code) => {
+          response.close(error=Server(code))
+          return
+        }
+        err => raise err
+      }
+      ignore(response.try_put(value) catch { _ => false })
+    },
+    reject: reason => response.close(error=reason),
+    watch,
+    on_ack,
+  }
+  if watch is Some(w) {
+    self.watches.push(w)
+  }
+  let mut started = false
+  let mut written = false
+  @async.with_timeout(self.request_timeout_ms, error=RequestTimeout, () => {
+    self.lock.acquire()
+    {
+      defer self.lock.release()
+      guard self.generation == generation && self.current_state == Connected else {
+        raise ClientError::Disconnected
+      }
+      started = true
+      @io.Writer::write(self.socket, wire)
+      written = true
+    }
+    response.get()
+  }) catch {
     error => {
-      self.mark_disconnected(Transport(error.to_string()))
-      if is_write && possibly_sent {
+      if error is ClientError::Server(_) {
+        raise error
+      }
+      if self.generation == generation {
+        if !started {
+          self.pending.remove(xid)
+        }
+        if started && (!written || xid < 0) && self.current_state == Connected {
+          self.mark_disconnected(Disconnected)
+        }
+      }
+      if is_write && started {
         raise OutcomeUnknown
       }
-      if error is ClientError::RequestTimeout ||
-        (@async.is_cancellation_error(error) && @async.now() >= deadline) {
-        raise ClientError::RequestTimeout
+      if error is ClientError::_ {
+        raise error
       }
       if @async.is_cancellation_error(error) {
         raise error
@@ -100,7 +126,6 @@ async fn[T] Client::request(
       raise Transport(error.to_string())
     }
   }
-  result
 }
 
 ///|

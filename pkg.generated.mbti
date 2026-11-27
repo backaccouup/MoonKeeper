@@ -6,6 +6,22 @@ import {
 }
 
 // Values
+pub const PERM_ADMIN : Int32 = 16
+
+pub const PERM_ALL : Int32 = 31
+
+pub const PERM_CREATE : Int32 = 4
+
+pub const PERM_DELETE : Int32 = 8
+
+pub const PERM_READ : Int32 = 1
+
+pub const PERM_WRITE : Int32 = 2
+
+pub fn creator_acl() -> Array[Acl]
+
+pub fn decode_auth_response(Bytes) -> Unit raise ProtocolError
+
 pub fn decode_connect_response(Bytes) -> ConnectResponse raise ProtocolError
 
 pub fn decode_create_response(Bytes) -> String raise ProtocolError
@@ -14,17 +30,27 @@ pub fn decode_delete_response(Bytes) -> Unit raise ProtocolError
 
 pub fn decode_exists_response(Bytes) -> Stat? raise ProtocolError
 
+pub fn decode_get_acl_response(Bytes) -> AclResult raise ProtocolError
+
 pub fn decode_get_children_response(Bytes) -> Array[String] raise ProtocolError
 
 pub fn decode_get_children_with_stat_response(Bytes) -> ChildrenResult raise ProtocolError
 
 pub fn decode_get_data_response(Bytes) -> DataResult raise ProtocolError
 
+pub fn decode_multi_response(Bytes, Array[MultiOp]) -> MultiOutcome raise ProtocolError
+
 pub fn decode_reply_header(Bytes) -> ReplyHeader raise ProtocolError
+
+pub fn decode_set_acl_response(Bytes) -> Stat raise ProtocolError
 
 pub fn decode_set_data_response(Bytes) -> Stat raise ProtocolError
 
 pub fn decode_watch_notification(Bytes) -> WatchNotice raise ProtocolError
+
+pub fn encode_auth_request(String, Bytes) -> Bytes raise ProtocolError
+
+pub fn encode_close_session(Int32) -> Bytes
 
 pub fn encode_connect_request(Int32, read_only? : Bool) -> Bytes raise ProtocolError
 
@@ -34,13 +60,23 @@ pub fn encode_delete_request(Int32, String, Int32) -> Bytes raise ProtocolError
 
 pub fn encode_exists_request(Int32, String) -> Bytes raise ProtocolError
 
+pub fn encode_get_acl_request(Int32, String) -> Bytes raise ProtocolError
+
 pub fn encode_get_children_request(Int32, String) -> Bytes raise ProtocolError
 
 pub fn encode_get_children_with_stat_request(Int32, String) -> Bytes raise ProtocolError
 
 pub fn encode_get_data_request(Int32, String) -> Bytes raise ProtocolError
 
+pub fn encode_multi_request(Int32, Array[MultiOp], max_frame_size? : Int32) -> Bytes raise ProtocolError
+
+pub fn encode_resume_request(Int32, Int64, Bytes, Int64, read_only? : Bool) -> Bytes raise ProtocolError
+
+pub fn encode_set_acl_request(Int32, String, Array[Acl], Int32) -> Bytes raise ProtocolError
+
 pub fn encode_set_data_request(Int32, String, Bytes?, Int32) -> Bytes raise ProtocolError
+
+pub fn encode_set_watches(Int64, Array[String], Array[String], Array[String]) -> Bytes raise ProtocolError
 
 pub fn encode_watch_children_request(Int32, String) -> Bytes raise ProtocolError
 
@@ -72,6 +108,8 @@ pub suberror ProtocolError {
   InvalidPath(String)
   InvalidVersion(Int32)
   InvalidAcl(String)
+  InvalidMulti(String)
+  InvalidAuth
   UnexpectedResponse(Int32)
   ServerError(Int32)
 }
@@ -87,6 +125,15 @@ pub(all) struct Acl {
 pub fn Acl::equal(Self, Self) -> Bool
 pub fn Acl::not_equal(Self, Self) -> Bool
 pub fn Acl::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) struct AclResult {
+  acl : Array[Acl]
+  stat : Stat
+}
+pub fn AclResult::equal(Self, Self) -> Bool
+pub fn AclResult::not_equal(Self, Self) -> Bool
+pub fn AclResult::to_repr(Self) -> @debug.Repr
 
 #derive(Eq, @debug.Debug)
 pub(all) struct ChildrenResult {
@@ -137,6 +184,35 @@ pub struct FrameDecoder {
 pub fn FrameDecoder::feed(Self, Bytes) -> Array[Bytes] raise ProtocolError
 pub fn FrameDecoder::finish(Self) -> Unit raise ProtocolError
 pub fn FrameDecoder::new(max_frame_size? : Int32) -> Self raise ProtocolError
+
+pub(all) enum MultiOp {
+  Create(String, Bytes?, CreateOptions)
+  SetData(String, Bytes?, Int32)
+  Delete(String, Int32)
+  Check(String, Int32)
+}
+
+#derive(Eq, @debug.Debug)
+pub(all) enum MultiOpResult {
+  Created(String)
+  DataSet(Stat)
+  Deleted
+  Checked
+  Failed(Int32)
+  NotApplied(Int32)
+}
+pub fn MultiOpResult::equal(Self, Self) -> Bool
+pub fn MultiOpResult::not_equal(Self, Self) -> Bool
+pub fn MultiOpResult::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) enum MultiOutcome {
+  Committed(Array[MultiOpResult])
+  Aborted(Int32, Array[MultiOpResult])
+}
+pub fn MultiOutcome::equal(Self, Self) -> Bool
+pub fn MultiOutcome::not_equal(Self, Self) -> Bool
+pub fn MultiOutcome::to_repr(Self) -> @debug.Repr
 
 pub(all) struct ReplyHeader {
   xid : Int32

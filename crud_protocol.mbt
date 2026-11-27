@@ -57,6 +57,29 @@ fn validate_version(version : Int32) -> Unit raise ProtocolError {
 }
 
 ///|
+fn write_create_body(
+  out : @buffer.Buffer,
+  path : String,
+  data : Bytes?,
+  options : CreateOptions,
+) -> Unit raise ProtocolError {
+  let sequential = match options.mode {
+    PersistentSequential | EphemeralSequential => true
+    _ => false
+  }
+  validate_create_path(path, sequential)
+  write_jute_string(out, path)
+  write_jute_buffer(out, data)
+  write_acl_vector(out, options.acl)
+  match options.mode {
+    Persistent => out.write_int_be(0)
+    Ephemeral => out.write_int_be(1)
+    PersistentSequential => out.write_int_be(2)
+    EphemeralSequential => out.write_int_be(3)
+  }
+}
+
+///|
 pub fn encode_create_request(
   xid : Int32,
   path : String,
@@ -64,37 +87,10 @@ pub fn encode_create_request(
   options : CreateOptions,
 ) -> Bytes raise ProtocolError {
   guard xid > 0 else { raise UnexpectedResponse(xid) }
-  let sequential = match options.mode {
-    PersistentSequential | EphemeralSequential => true
-    _ => false
-  }
-  validate_create_path(path, sequential)
-  guard !options.acl.is_empty() else {
-    raise InvalidAcl("ACL must not be empty")
-  }
   let out = @buffer.Buffer()
   out.write_int_be(xid)
   out.write_int_be(1)
-  write_jute_string(out, path)
-  write_jute_buffer(out, data)
-  out.write_int_be(options.acl.length())
-  for acl in options.acl {
-    guard acl.permissions > 0 &&
-      acl.permissions <= 31 &&
-      !acl.scheme.is_empty() &&
-      !acl.id.is_empty() else {
-      raise InvalidAcl("permissions, scheme, and id must be valid")
-    }
-    out.write_int_be(acl.permissions)
-    write_jute_string(out, acl.scheme)
-    write_jute_string(out, acl.id)
-  }
-  match options.mode {
-    Persistent => out.write_int_be(0)
-    Ephemeral => out.write_int_be(1)
-    PersistentSequential => out.write_int_be(2)
-    EphemeralSequential => out.write_int_be(3)
-  }
+  write_create_body(out, path, data, options)
   finish_node_request(out)
 }
 
@@ -113,21 +109,46 @@ pub fn encode_get_data_request(
 }
 
 ///|
+fn write_set_data_body(
+  out : @buffer.Buffer,
+  path : String,
+  data : Bytes?,
+  version : Int32,
+) -> Unit raise ProtocolError {
+  validate_path(path)
+  validate_version(version)
+  write_jute_string(out, path)
+  write_jute_buffer(out, data)
+  out.write_int_be(version)
+}
+
+///|
 pub fn encode_set_data_request(
   xid : Int32,
   path : String,
   data : Bytes?,
   version : Int32,
 ) -> Bytes raise ProtocolError {
-  validate_node_request(xid, path, true)
-  validate_version(version)
+  guard xid > 0 else { raise UnexpectedResponse(xid) }
   let out = @buffer.Buffer()
   out.write_int_be(xid)
   out.write_int_be(5)
-  write_jute_string(out, path)
-  write_jute_buffer(out, data)
-  out.write_int_be(version)
+  write_set_data_body(out, path, data, version)
   finish_node_request(out)
+}
+
+///|
+fn write_path_version(
+  out : @buffer.Buffer,
+  path : String,
+  version : Int32,
+  allow_root~ : Bool,
+) -> Unit raise ProtocolError {
+  validate_path(path)
+  guard allow_root || path != "/" else { raise InvalidPath(path) }
+  validate_version(version)
+  write_jute_string(out, path)
+  out.write_int_be(version)
 }
 
 ///|
@@ -136,13 +157,11 @@ pub fn encode_delete_request(
   path : String,
   version : Int32,
 ) -> Bytes raise ProtocolError {
-  validate_node_request(xid, path, false)
-  validate_version(version)
+  guard xid > 0 else { raise UnexpectedResponse(xid) }
   let out = @buffer.Buffer()
   out.write_int_be(xid)
   out.write_int_be(2)
-  write_jute_string(out, path)
-  out.write_int_be(version)
+  write_path_version(out, path, version, allow_root=false)
   finish_node_request(out)
 }
 

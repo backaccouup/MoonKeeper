@@ -175,13 +175,19 @@ async test "event budget overflow is explicit and cancellation clears local subs
 }
 
 ///|
-async test "timed out watch registration closes its connection" {
+async test "timed out watch registration consumes its late reply without a subscriber" {
   with_peer(
     conn => {
       ignore(conn.read_exactly(49))
       conn.write(fixture())
       watched_request(conn, 1, 3)
-      assert_eq(conn.read_some(), None)
+      watched_request(conn, 2, 3)
+      conn.write(
+        watched_reply(1, -101) +
+        watched_notification(1, b"/x") +
+        watched_reply(2, -101) +
+        watched_notification(1, b"/y"),
+      )
     },
     endpoint => {
       @client.with_client(
@@ -194,7 +200,8 @@ async test "timed out watch registration closes its connection" {
             @client.ClientError::RequestTimeout => ()
             err => fail("unexpected: \{err}")
           }
-          assert_eq(client.state(), @client.ClientState::Disconnected)
+          let (_, fresh) = client.watch_exists("/y")
+          assert_eq(fresh.next_event().unwrap().path, "/y")
         },
       )
     },

@@ -19,6 +19,8 @@ pub suberror ProtocolError {
   InvalidPath(String)
   InvalidVersion(Int32)
   InvalidAcl(String)
+  InvalidMulti(String)
+  InvalidAuth
   UnexpectedResponse(Int32)
   ServerError(Int32)
 }
@@ -42,20 +44,40 @@ pub struct ConnectResponse {
 /// Encode a new-session ConnectRequest, including its four-byte length prefix.
 /// Uses protocol version 0, zero last-zxid/session ID, and a 16-byte zero password.
 /// `read_only` allows a connection to a read-only server; it defaults to false.
-/// Resuming an existing session is not supported by this initial API.
+/// Use encode_resume_request for an established session.
 pub fn encode_connect_request(
   session_timeout_ms : Int32,
   read_only~ : Bool = false,
 ) -> Bytes raise ProtocolError {
+  encode_resume_request(
+    session_timeout_ms,
+    0L,
+    Bytes::make(16, b'\x00'),
+    0L,
+    read_only~,
+  )
+}
+
+///|
+pub fn encode_resume_request(
+  session_timeout_ms : Int32,
+  session_id : Int64,
+  password : Bytes,
+  last_zxid : Int64,
+  read_only~ : Bool = false,
+) -> Bytes raise ProtocolError {
   guard session_timeout_ms > 0 else { raise InvalidTimeout(session_timeout_ms) }
+  guard password.length() == 16 else {
+    raise InvalidBufferLength(password.length())
+  }
   let out = @buffer.Buffer()
   out.write_int_be(45)
   out.write_int_be(0)
-  out.write_int64_be(0L)
+  out.write_int64_be(last_zxid)
   out.write_int_be(session_timeout_ms)
-  out.write_int64_be(0L)
+  out.write_int64_be(session_id)
   out.write_int_be(16)
-  out.write_bytes(Bytes::make(16, b'\x00'))
+  out.write_bytes(password)
   out.write_byte(if read_only { b'\x01' } else { b'\x00' })
   out.to_bytes()
 }

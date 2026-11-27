@@ -40,7 +40,7 @@ async test "exists returns None for no node and keeps distinct xids" {
 }
 
 ///|
-async test "exists timeout closes the connection and is not session expiry" {
+async test "late replies after a timeout do not consume another request" {
   with_peer(
     conn => {
       ignore(conn.read_exactly(49))
@@ -51,7 +51,9 @@ async test "exists timeout closes the connection and is not session expiry" {
         _ => fail("size")
       }
       ignore(conn.read_exactly(size))
-      assert_eq(conn.read_some(), None)
+      guard conn.read_exactly(4) is [i32be(next_size)] else { fail("length") }
+      ignore(conn.read_exactly(next_size))
+      conn.write(watched_reply(1, -102) + watched_reply(2, -101))
     },
     endpoint => {
       @client.with_client(
@@ -64,7 +66,8 @@ async test "exists timeout closes the connection and is not session expiry" {
             @client.ClientError::RequestTimeout => ()
             err => fail("unexpected: \{err}")
           }
-          assert_eq(client.state(), @client.ClientState::Disconnected)
+          assert_eq(client.state(), @client.ClientState::Connected)
+          assert_eq(client.exists("/again"), None)
         },
       )
     },

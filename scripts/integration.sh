@@ -4,7 +4,11 @@ set -euo pipefail
 mode=${1:-single}
 zk_host=${2:-127.0.0.1}
 zk_port=${3:-21819}
-case "$mode" in single|existing) ;; *) echo 'Usage: integration.sh [single|existing] [host] [port]' >&2; exit 2 ;; esac
+if [[ "$mode" == cluster ]]; then
+  cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+  exec python3 integration/cluster.py
+fi
+case "$mode" in single|existing) ;; *) echo 'Usage: integration.sh [single|existing|cluster] [host] [port]' >&2; exit 2 ;; esac
 if [[ ! "$zk_port" =~ ^[0-9]{1,5}$ ]] || ((10#$zk_port < 1 || 10#$zk_port > 65535)); then
   echo 'Port must be in 1..65535.' >&2; exit 2
 fi
@@ -34,3 +38,4 @@ for attempt in {1..6}; do
 done
 [[ "$ready" == true ]] || { echo "ZooKeeper handshake readiness failed at $zk_host:$zk_port." >&2; exit 1; }
 moon test integration --target native --include-skipped --deny-warn
+python3 integration/interop.py
