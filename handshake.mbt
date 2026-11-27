@@ -77,7 +77,7 @@ pub fn encode_resume_request(
   out.write_int_be(session_timeout_ms)
   out.write_int64_be(session_id)
   out.write_int_be(16)
-  out.write_bytes(password)
+  out.write_bytesview(password)
   out.write_byte(if read_only { b'\x01' } else { b'\x00' })
   out.to_bytes()
 }

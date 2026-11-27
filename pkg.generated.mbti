@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "Mr-Shi123/moonkeeper"
+package "backaccouup/moonkeeper"
 
 import {
   "moonbitlang/core/debug",

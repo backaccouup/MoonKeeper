@@ -163,7 +163,7 @@ fn number(
   name : String,
   minimum : Int32,
 ) -> Int32 raise Usage {
-  let n = @string.parse_int(value, base=10) catch {
+  let n = @string.parse_int(value, radix=10) catch {
     _ => raise Usage("invalid integer for " + name)
   }
   guard n >= minimum else { raise Usage(name + " is out of range") }

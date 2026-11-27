@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "Mr-Shi123/moonkeeper/examples/common"
+package "backaccouup/moonkeeper/examples/common"
 
 import {
-  "Mr-Shi123/moonkeeper/client",
+  "backaccouup/moonkeeper/client",
 }
 
 // Values

@@ -61,7 +61,7 @@ CLI 和示例创建的节点均使用开放 ACL `world:anyone` 的全部权限�
 
 ## 在 MoonBit 中使用客户端
 
-在 native 包的 `moon.pkg` 中导入 `Mr-Shi123/moonkeeper`、`Mr-Shi123/moonkeeper/client` 和 `moonbitlang/async`。以下函数在一个会话内读取数据。回调返回时 `with_client` 关闭会话，读取失败时错误会传给调用方。
+在 native 包的 `moon.pkg` 中导入 `backaccouup/moonkeeper`、`backaccouup/moonkeeper/client` 和 `moonbitlang/async`。以下函数在一个会话内读取数据。回调返回时 `with_client` 关闭会话，读取失败时错误会传给调用方。
 
 ```moonbit
 async fn read_config(path : String) -> @moonkeeper.DataResult {

@@ -5,7 +5,7 @@
 fn write_jute_string(out : @buffer.Buffer, value : String) -> Unit {
   let bytes = @utf8.encode(value)
   out.write_int_be(bytes.length())
-  out.write_bytes(bytes)
+  out.write_bytesview(bytes)
 }
 
 ///|
@@ -14,7 +14,7 @@ fn write_jute_buffer(out : @buffer.Buffer, value : Bytes?) -> Unit {
     None => out.write_int_be(-1)
     Some(bytes) => {
       out.write_int_be(bytes.length())
-      out.write_bytes(bytes)
+      out.write_bytesview(bytes)
     }
   }
 }
@@ -25,7 +25,7 @@ fn finish_node_request(out : @buffer.Buffer) -> Bytes raise ProtocolError {
   guard body.length() <= 1048576 else { raise FrameTooLarge(body.length()) }
   let frame = @buffer.Buffer()
   frame.write_int_be(body.length())
-  frame.write_bytes(body)
+  frame.write_bytesview(body)
   frame.to_bytes()
 }
 

@@ -1,7 +1,7 @@
 import {
-  "Mr-Shi123/moonkeeper",
-  "Mr-Shi123/moonkeeper/client",
-  "Mr-Shi123/moonkeeper/examples/common",
+  "backaccouup/moonkeeper",
+  "backaccouup/moonkeeper/client",
+  "backaccouup/moonkeeper/examples/common",
   "moonbitlang/async",
   "moonbitlang/async/io",
   "moonbitlang/async/stdio",

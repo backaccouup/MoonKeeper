@@ -54,10 +54,7 @@ async fn open_initial(
       )
       return (index, socket, info, password)
     } catch {
-      error => {
-        if @async.is_cancellation_error(error) {
-          raise error
-        }
+      error =>
         if index + 1 == endpoints.length() {
           match error {
             ClientError::_ as e => raise e
@@ -65,7 +62,6 @@ async fn open_initial(
             _ => raise Transport(error.to_string())
           }
         }
-      }
     }
   }
   raise InvalidOptions("no endpoint")
@@ -207,7 +203,7 @@ async fn Client::restore(self : Client, policy : ReconnectPolicy) -> Unit {
         self.end_session(AuthFailed, Server(-115))
         return
       }
-      e => if @async.is_cancellation_error(e) { return }
+      _ => ()
     }
     delay = Int32::min(policy.max_delay_ms, delay * 2)
   }

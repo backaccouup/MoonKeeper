@@ -32,7 +32,7 @@ async test "child queries use distinct opcodes and return names plus Stat" {
         reply.write_int_be(xid)
         reply.write_int64_be(1L)
         reply.write_int_be(0)
-        reply.write_bytes(body)
+        reply.write_bytesview(body)
         conn.write(reply.to_bytes())
       }
     },

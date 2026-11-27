@@ -4,6 +4,23 @@
 
 MoonKeeper 是用 MoonBit 实现的 Apache ZooKeeper 客户端。你可以用它读取配置并监听变化，用临时顺序节点注册服务，或用一个原子事务同时更新多个节点。网络客户端直接通过 TCP 与 ZooKeeper 通信。
 
+## 从 Mooncakes 安装
+
+在自己的 MoonBit 项目根目录执行：
+
+```sh
+moon add backaccouup/moonkeeper@0.1.0
+```
+
+在使用网络客户端的 `moon.pkg` 中加入以下配置，然后运行 `moon check --target native`。本版使用 `moonc 1.0.0-rc1+3c0520448` 构建和测试。[Mooncakes 包页面](https://mooncakes.io/docs/backaccouup/moonkeeper/)
+
+```moonbit
+import {
+  "backaccouup/moonkeeper/client",
+}
+supported_targets = "native"
+```
+
 ## 五分钟试用
 
 准备 MoonBit 工具链、C 编译器和 ZooKeeper 3.9.3。下面使用本地测试实例，监听 `127.0.0.1:21819`。在空的测试实例中执行：
@@ -37,7 +54,7 @@ docker compose -f integration/compose.yaml down --volumes
 | 原子事务 | `multi` 支持 Create、SetData、Delete 和 Check。返回逐项结果和事务是否提交。[事务示例](docs/transactions.md) |
 | 会话 | 按 xid 分发并发请求、空闲心跳、限时关闭。提供备用地址和恢复策略后，可在原会话内恢复凭据和 Watch。[会话与失败语义](docs/semantics.md) |
 
-根协议包为 `Mr-Shi123/moonkeeper`，native 客户端包为 `Mr-Shi123/moonkeeper/client`。本版本从仓库源码构建。CLI 使用本地安装的 MoonBit 编译运行，默认后端为 native。
+根协议包为 `backaccouup/moonkeeper`，native 客户端包为 `backaccouup/moonkeeper/client`。CLI 使用本地安装的 MoonBit 编译运行，默认后端为 native。
 
 ## 构建与验证
 

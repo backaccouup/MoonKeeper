@@ -69,8 +69,10 @@ async fn[T] Client::request(
     }
   }
   let response : @aqueue.Queue[T] = @aqueue.Queue::Queue(kind=Blocking(1))
+  let mut answered = false
   self.pending[xid] = {
     accept: payload => {
+      answered = true
       let value = decode(payload) catch {
         @moonkeeper.ProtocolError::ServerError(code) => {
           response.close(error=Server(code))
@@ -89,6 +91,16 @@ async fn[T] Client::request(
   }
   let mut started = false
   let mut written = false
+  // Cancellation in RC1 unwinds defer without entering catch. Retire unsent
+  // requests and discard a connection that may contain a partial frame.
+  defer (if !answered && self.generation == generation {
+    if !started {
+      self.pending.remove(xid)
+    }
+    if started && (!written || xid < 0) && self.current_state == Connected {
+      self.mark_disconnected(Disconnected)
+    }
+  })
   @async.with_timeout(self.request_timeout_ms, error=RequestTimeout, () => {
     self.lock.acquire()
     {
@@ -106,21 +118,10 @@ async fn[T] Client::request(
       if error is ClientError::Server(_) {
         raise error
       }
-      if self.generation == generation {
-        if !started {
-          self.pending.remove(xid)
-        }
-        if started && (!written || xid < 0) && self.current_state == Connected {
-          self.mark_disconnected(Disconnected)
-        }
-      }
       if is_write && started {
         raise OutcomeUnknown
       }
       if error is ClientError::_ {
-        raise error
-      }
-      if @async.is_cancellation_error(error) {
         raise error
       }
       raise Transport(error.to_string())

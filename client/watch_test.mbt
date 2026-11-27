@@ -8,7 +8,7 @@ fn watched_reply(xid : Int32, error : Int32, body~ : Bytes = b"") -> Bytes {
   out.write_int_be(xid)
   out.write_int64_be(1L)
   out.write_int_be(error)
-  out.write_bytes(body)
+  out.write_bytesview(body)
   out.to_bytes()
 }
 
@@ -22,7 +22,7 @@ fn watched_notification(kind : Int32, path : Bytes) -> Bytes {
   out.write_int_be(kind)
   out.write_int_be(3)
   out.write_int_be(path.length())
-  out.write_bytes(path)
+  out.write_bytesview(path)
   out.to_bytes()
 }
 

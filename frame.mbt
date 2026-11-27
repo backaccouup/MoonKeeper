@@ -38,7 +38,7 @@ pub fn FrameDecoder::feed(
   while offset < chunk.length() {
     if self.frame_length is None {
       let count = Int32::min(4 - self.buffer.length(), chunk.length() - offset)
-      self.buffer.write_bytes(chunk[offset:offset + count])
+      self.buffer.write_bytesview(chunk[offset:offset + count])
       offset += count
       if self.buffer.length() < 4 {
         continue
@@ -63,7 +63,7 @@ pub fn FrameDecoder::feed(
         length - self.buffer.length(),
         chunk.length() - offset,
       )
-      self.buffer.write_bytes(chunk[offset:offset + count])
+      self.buffer.write_bytesview(chunk[offset:offset + count])
       offset += count
       if self.buffer.length() == length {
         frames.push(self.buffer.to_bytes())

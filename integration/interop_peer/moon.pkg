@@ -1,6 +1,6 @@
 import {
-  "Mr-Shi123/moonkeeper",
-  "Mr-Shi123/moonkeeper/client",
+  "backaccouup/moonkeeper",
+  "backaccouup/moonkeeper/client",
   "moonbitlang/async",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",

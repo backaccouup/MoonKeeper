@@ -26,7 +26,7 @@ async test "CRUD calls send distinct xids and expose server versions" {
         reply.write_int_be(xid)
         reply.write_int64_be(1L)
         reply.write_int_be(0)
-        reply.write_bytes(response)
+        reply.write_bytesview(response)
         conn.write(reply.to_bytes())
       }
     },
@@ -116,7 +116,7 @@ async test "invalid version and full frame limit fail before any write" {
       reply.write_int64_be(1L)
       reply.write_int_be(0)
       reply.write_int_be(-1)
-      reply.write_bytes(stat_fixture(0))
+      reply.write_bytesview(stat_fixture(0))
       conn.write(reply.to_bytes())
     },
     endpoint => {
@@ -128,7 +128,7 @@ async test "invalid version and full frame limit fail before any write" {
             fail("expected invalid version")
           } catch {
             @client.ClientError::Protocol(
-              @moonkeeper.ProtocolError::InvalidVersion(-2)
+              @moonkeeper.ProtocolError::InvalidVersion(-2),
             ) => ()
             err => fail("unexpected: \{err}")
           }
@@ -137,7 +137,7 @@ async test "invalid version and full frame limit fail before any write" {
             fail("expected oversized frame")
           } catch {
             @client.ClientError::Protocol(
-              @moonkeeper.ProtocolError::FrameTooLarge(_)
+              @moonkeeper.ProtocolError::FrameTooLarge(_),
             ) => ()
             err => fail("unexpected: \{err}")
           }
@@ -165,7 +165,7 @@ async test "mismatched write response is an unknown outcome" {
       reply.write_int_be(999)
       reply.write_int64_be(1L)
       reply.write_int_be(0)
-      reply.write_bytes(stat_fixture(1))
+      reply.write_bytesview(stat_fixture(1))
       conn.write(reply.to_bytes())
     },
     endpoint => {

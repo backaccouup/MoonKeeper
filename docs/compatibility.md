@@ -1,6 +1,6 @@
 # Compatibility and acceptance / 兼容性与验收
 
-MoonKeeper 1.0.0 targets ZooKeeper 3.9.3. The build uses moonc 0.10.19+bee578715, moon 0.1.20261102 and `moonbitlang/async@0.20.3`. The root protocol package builds for native, JavaScript, wasm and wasm-gc. The socket client, CLI and network examples target native. Run from a clone of this repository with a C compiler and Node.js available.
+MoonKeeper targets ZooKeeper 3.9.3. The build uses moonc 1.0.0-rc1+3c0520448, moon 0.1.20261126 and `moonbitlang/async@0.22.11`. The root protocol package builds for native, JavaScript, wasm and wasm-gc. The socket client, CLI and network examples target native. Run from a clone of this repository with a C compiler and Node.js available.
 
 | Environment | Verification |
 | --- | --- |

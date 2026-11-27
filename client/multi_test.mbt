@@ -24,7 +24,7 @@ async test "multi rejects empty and oversized batches before writing, lost reply
             fail("empty transaction accepted")
           } catch {
             @client.ClientError::Protocol(
-              @moonkeeper.ProtocolError::InvalidMulti(_)
+              @moonkeeper.ProtocolError::InvalidMulti(_),
             ) => ()
             err => raise err
           }
@@ -33,7 +33,7 @@ async test "multi rejects empty and oversized batches before writing, lost reply
             fail("aggregate frame limit ignored")
           } catch {
             @client.ClientError::Protocol(
-              @moonkeeper.ProtocolError::FrameTooLarge(_)
+              @moonkeeper.ProtocolError::FrameTooLarge(_),
             ) => ()
             err => raise err
           }

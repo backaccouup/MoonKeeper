@@ -1,8 +1,10 @@
-name = "Mr-Shi123/moonkeeper"
+name = "backaccouup/moonkeeper"
 
-version = "1.0.0"
+version = "0.1.0"
 
 readme = "README.md"
+
+repository = "https://github.com/backaccouup/MoonKeeper"
 
 license = "Apache-2.0"
 
@@ -13,5 +15,5 @@ description = "ZooKeeper client for MoonBit: sessions, watches, ACLs, transactio
 preferred_target = "native"
 
 import {
-  "moonbitlang/async@0.20.3",
+  "moonbitlang/async@0.22.11",
 }

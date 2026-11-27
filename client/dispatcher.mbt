@@ -205,7 +205,7 @@ async fn Client::read_loop(
       self.dispatch_payload(payload)
     } catch {
       error => {
-        if self.generation == generation && !@async.is_cancellation_error(error) {
+        if self.generation == generation {
           let reason = match error {
             ClientError::_ as e => e
             @moonkeeper.ProtocolError::_ as e => Protocol(e)
@@ -264,7 +264,7 @@ async fn Client::heartbeat_loop(self : Client, generation : Int32) -> Unit {
     ).to_int()
     @async.with_timeout(budget, () => self.send_ping()) catch {
       error => {
-        if self.generation == generation && !@async.is_cancellation_error(error) {
+        if self.generation == generation {
           self.mark_disconnected(Transport(error.to_string()))
         }
         return

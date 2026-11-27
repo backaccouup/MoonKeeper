@@ -1,5 +1,5 @@
 import {
-  "Mr-Shi123/moonkeeper",
+  "backaccouup/moonkeeper",
 }
 
 pkgtype(kind: "executable")

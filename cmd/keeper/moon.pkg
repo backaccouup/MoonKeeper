@@ -1,7 +1,6 @@
 import {
-  "Mr-Shi123/moonkeeper",
-  "Mr-Shi123/moonkeeper/client",
-  "moonbitlang/async",
+  "backaccouup/moonkeeper",
+  "backaccouup/moonkeeper/client",
   "moonbitlang/async/fs",
   "moonbitlang/async/io",
   "moonbitlang/async/stdio",
@@ -11,6 +10,10 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/string",
 }
+
+import {
+  "moonbitlang/async",
+} for "wbtest"
 
 supported_targets = "native"
 

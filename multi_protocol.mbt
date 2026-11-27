@@ -80,7 +80,7 @@ pub fn encode_multi_request(
       raise FrameTooLarge(size)
     }
   }
-  out.write_bytes(b"\xff\xff\xff\xff\x01\xff\xff\xff\xff")
+  out.write_bytesview(b"\xff\xff\xff\xff\x01\xff\xff\xff\xff")
   finish_node_request(out)
 }
 

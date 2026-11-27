@@ -136,9 +136,6 @@ async fn main {
       @env.exit(2)
     }
     error => {
-      if @async.is_cancellation_error(error) {
-        raise error
-      }
       @io.Writer::write(@stdio.stderr, "keeper: \{error}\n")
       @env.exit(1)
     }

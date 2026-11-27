@@ -14,7 +14,7 @@ pub fn encode_exists_request(
   out.write_int_be(xid)
   out.write_int_be(3)
   out.write_int_be(path_bytes.length())
-  out.write_bytes(path_bytes)
+  out.write_bytesview(path_bytes)
   out.write_byte(b'\x00')
   out.to_bytes()
 }

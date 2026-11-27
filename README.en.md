@@ -4,6 +4,23 @@
 
 MoonKeeper is a MoonBit client for Apache ZooKeeper. It speaks the wire protocol over native TCP. Use it to watch configuration, register ephemeral services or commit several znode updates atomically.
 
+## Install from Mooncakes
+
+Run this command in your MoonBit project:
+
+```sh
+moon add backaccouup/moonkeeper@0.1.0
+```
+
+Import the client in the consuming package's `moon.pkg`, then run `moon check --target native`. The tested compiler is `moonc 1.0.0-rc1+3c0520448`. [Mooncakes package](https://mooncakes.io/docs/backaccouup/moonkeeper/)
+
+```moonbit
+import {
+  "backaccouup/moonkeeper/client",
+}
+supported_targets = "native"
+```
+
 ## Try a data watch
 
 Use a MoonBit installation with a C compiler and a fresh test server. The supplied Compose file starts ZooKeeper 3.9.3 on the loopback interface.
@@ -35,7 +52,7 @@ docker compose -f integration/compose.yaml down --volumes
 | Atomic writes | Create, SetData, Delete and Check in a single `multi` request with ordered results. [Transactions](docs/transactions.md) |
 | Sessions | Concurrent request dispatch, heartbeats, scoped close and optional session recovery across endpoints. [Failure semantics](docs/semantics.md) |
 
-Build from source. The portable protocol package is `Mr-Shi123/moonkeeper`. The network package is `Mr-Shi123/moonkeeper/client` and targets native. The CLI and two executable examples use the public client API. [CLI and examples](docs/usage.md)
+The portable protocol package is `backaccouup/moonkeeper`. The network package is `backaccouup/moonkeeper/client` and targets native. The CLI and two executable examples use the public client API. [CLI and examples](docs/usage.md)
 
 ## Verification
 

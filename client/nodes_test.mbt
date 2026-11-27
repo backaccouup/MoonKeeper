@@ -97,7 +97,7 @@ async test "invalid path leaves an established session usable" {
           fail("expected invalid path")
         } catch {
           @client.ClientError::Protocol(
-            @moonkeeper.ProtocolError::InvalidPath(_)
+            @moonkeeper.ProtocolError::InvalidPath(_),
           ) => ()
           err => fail("unexpected: \{err}")
         }

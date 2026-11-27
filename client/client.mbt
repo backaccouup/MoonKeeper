@@ -205,7 +205,7 @@ pub async fn[T] with_client(
       current_state: Connected,
     }
     client.start_io()
-    defer client.close()
+    defer @async.protect_from_cancel(() => client.close())
     result = Some(body(client))
   })
   result.unwrap()

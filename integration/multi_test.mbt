@@ -17,12 +17,12 @@ async test "real multi commits mixed operations and rolls back a bad middle chec
     let sequential = @moonkeeper.CreateOptions::new(PersistentSequential, acl)
     ignore(writer.create(base, Some(b"old"), normal))
     @client.with_client(options, reader => {
-      defer {
+      defer @async.protect_from_cancel(() => {
         for name in reader.get_children(base) {
           reader.delete(base + "/" + name, -1)
         }
         reader.delete(base, -1)
-      }
+      })
       let removed = base + "/removed"
       ignore(writer.create(removed, None, normal))
       let prefix = base + "/item-"
